@@ -22,20 +22,20 @@ if [[ "$COMMAND_LC" =~ (--repo|-r)[[:space:]]*grafana/grafana ]] || [[ "$COMMAND
 fi
 
 targets_fork_explicit="false"
-if [[ "$COMMAND_LC" =~ (--repo|-r)[[:space:]]*fieldsphere/grafana ]] || [[ "$COMMAND_LC" =~ github\.com/fieldsphere/grafana ]]; then
+if [[ "$COMMAND_LC" =~ (--repo|-r)[[:space:]]*lkamak/grafana ]] || [[ "$COMMAND_LC" =~ github\.com/lkamak/grafana ]]; then
   targets_fork_explicit="true"
 fi
 
 if [[ "$is_mutating" == "true" && "$targets_upstream" == "true" ]]; then
   cat <<'EOF'
-{"continue":true,"permission":"deny","user_message":"Blocked: write actions to grafana/grafana are not allowed from this repo. Target fieldsphere/grafana instead.","agent_message":"This gh command appears to perform a write operation against grafana/grafana. Use --repo fieldsphere/grafana for write actions."}
+{"continue":true,"permission":"deny","user_message":"Blocked: write actions to grafana/grafana are not allowed from this repo. Target lkamak/grafana instead.","agent_message":"This gh command appears to perform a write operation against grafana/grafana. Use --repo lkamak/grafana for write actions."}
 EOF
   exit 0
 fi
 
 if [[ "$is_mutating" == "true" && "$targets_fork_explicit" != "true" ]]; then
   cat <<'EOF'
-{"continue":true,"permission":"deny","user_message":"Blocked: mutating gh commands must include --repo fieldsphere/grafana.","agent_message":"For safety, mutating gh commands must explicitly target the fork via --repo fieldsphere/grafana."}
+{"continue":true,"permission":"deny","user_message":"Blocked: mutating gh commands must include --repo lkamak/grafana.","agent_message":"For safety, mutating gh commands must explicitly target the fork via --repo lkamak/grafana."}
 EOF
   exit 0
 fi

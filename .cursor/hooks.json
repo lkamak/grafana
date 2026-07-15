@@ -3,7 +3,7 @@
   "hooks": {
     "beforeShellExecution": [
       {
-        "command": ".cursor/hooks/enforce-fieldsphere-gh.sh",
+        "command": ".cursor/hooks/enforce-lkamak-gh.sh",
         "matcher": "(^|\\s)gh(\\s|$)"
       }
     ]
