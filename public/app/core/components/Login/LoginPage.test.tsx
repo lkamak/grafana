@@ -43,6 +43,7 @@ describe('Login Page', () => {
     render(<LoginPage />);
 
     expect(screen.getByRole('heading', { name: 'Welcome to Grafana' })).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Lightbox demo environment' })).toBeInTheDocument();
     expect(screen.getByRole('textbox', { name: 'Email or username' })).toBeInTheDocument();
     expect(screen.getByLabelText('Password')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
