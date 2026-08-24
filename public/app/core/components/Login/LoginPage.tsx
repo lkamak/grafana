@@ -41,6 +41,7 @@ const LoginPage = () => {
           <LoginLayout isChangingPassword={isChangingPassword}>
             {!isChangingPassword && (
               <InnerBox>
+                <Alert className={styles.alert} severity="info" title={t('login.glk-test-note', 'GLK test note')} />
                 {loginErrorMessage && (
                   <Alert className={styles.alert} severity="error" title={t('login.error.title', 'Login failed')}>
                     {loginErrorMessage}
