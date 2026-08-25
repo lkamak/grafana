@@ -69,6 +69,20 @@ describe('PanelVersionDiff', () => {
     expect(screen.getByTestId('panel-version-diff-tile-3')).toHaveTextContent('added');
   });
 
+  it('keeps current tiles above moved-panel ghosts so destination panels stay clickable', async () => {
+    const user = userEvent.setup();
+    render(<PanelVersionDiff lhs={lhs} rhs={rhs} />);
+
+    const ghost = screen.getByTestId('panel-version-diff-ghost-2');
+    const added = screen.getByTestId('panel-version-diff-tile-3');
+
+    expect(Number(window.getComputedStyle(ghost).zIndex)).toBeLessThan(Number(window.getComputedStyle(added).zIndex));
+
+    await user.click(added);
+
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Errors');
+  });
+
   it('shows human-readable field changes when a changed panel is clicked', async () => {
     const user = userEvent.setup();
     render(<PanelVersionDiff lhs={lhs} rhs={rhs} />);

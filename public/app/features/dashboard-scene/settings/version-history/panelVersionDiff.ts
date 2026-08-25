@@ -239,15 +239,17 @@ function walkV2Layout(
   }
 
   if (kind === 'TabsLayout' && Array.isArray(spec.tabs)) {
-    let nextOffset = yOffset;
+    let maxOffset = yOffset;
     for (const tab of spec.tabs) {
       if (!isRecord(tab)) {
         continue;
       }
       const tabSpec = isRecord(tab.spec) ? tab.spec : tab;
-      nextOffset = walkV2Layout(tabSpec.layout, elements, nextOffset, snapshots);
+      // Tabs are alternative views, not a vertical stack. Each tab keeps the same
+      // base offset so a height change in one tab does not shift later-tab panels.
+      maxOffset = Math.max(maxOffset, walkV2Layout(tabSpec.layout, elements, yOffset, snapshots));
     }
-    return nextOffset;
+    return maxOffset;
   }
 
   return yOffset;

@@ -231,6 +231,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
     cursor: 'pointer',
     overflow: 'hidden',
     minWidth: 0,
+    zIndex: 1,
   }),
   tileTitle: css({
     fontSize: theme.typography.bodySmall.fontSize,
@@ -243,10 +244,11 @@ const getStyles = (theme: GrafanaTheme2) => ({
   ghost: css({
     opacity: 0.45,
     borderStyle: 'dashed',
+    zIndex: 0,
   }),
   selected: css({
     boxShadow: `0 0 0 1px ${theme.colors.primary.border}`,
-    zIndex: 1,
+    zIndex: 2,
   }),
   added: css({
     borderColor: theme.colors.success.border,

@@ -104,6 +104,19 @@ describe('extractPanels', () => {
       },
     ]);
   });
+
+  it('places each tab on the same base offset instead of stacking them', () => {
+    const panels = extractPanels(
+      tabsDashboard([
+        { id: 1, title: 'CPU', y: 0, height: 8 },
+        { id: 2, title: 'Memory', y: 0, height: 8 },
+      ])
+    );
+
+    expect(panels).toHaveLength(2);
+    expect(panels[0].gridPos).toEqual({ x: 0, y: 0, w: 12, h: 8 });
+    expect(panels[1].gridPos).toEqual({ x: 0, y: 0, w: 12, h: 8 });
+  });
 });
 
 describe('diffDashboardPanels', () => {
@@ -189,4 +202,70 @@ describe('diffDashboardPanels', () => {
     expect(item.kind).toBe('changed');
     expect(item.changes.map((change) => change.field)).toEqual(['title', 'layout']);
   });
+
+  it('does not mark later-tab panels as moved when an earlier tab grows', () => {
+    const lhs = tabsDashboard([
+      { id: 1, title: 'CPU', y: 0, height: 8 },
+      { id: 2, title: 'Memory', y: 0, height: 8 },
+    ]);
+    const rhs = tabsDashboard([
+      { id: 1, title: 'CPU', y: 0, height: 16 },
+      { id: 2, title: 'Memory', y: 0, height: 8 },
+    ]);
+
+    const diff = diffDashboardPanels(lhs, rhs);
+    const byId = Object.fromEntries(diff.map((item) => [item.id, item]));
+
+    expect(byId['1'].kind).toBe('moved');
+    expect(byId['2'].kind).toBe('unchanged');
+    expect(byId['2'].changes).toEqual([]);
+  });
 });
+
+function tabsDashboard(tabs: Array<{ id: number; title: string; y: number; height: number }>) {
+  const elements: Record<string, unknown> = {};
+  const tabItems = tabs.map((tab) => {
+    const elementName = `panel-${tab.id}`;
+    elements[elementName] = {
+      kind: 'Panel',
+      spec: {
+        id: tab.id,
+        title: tab.title,
+        vizConfig: { kind: 'VizConfig', group: 'timeseries', spec: { fieldConfig: { defaults: {} } } },
+        data: { kind: 'QueryGroup', spec: { queries: [] } },
+      },
+    };
+
+    return {
+      kind: 'TabsLayoutTab',
+      spec: {
+        title: tab.title,
+        layout: {
+          kind: 'GridLayout',
+          spec: {
+            items: [
+              {
+                kind: 'GridLayoutItem',
+                spec: {
+                  x: 0,
+                  y: tab.y,
+                  width: 12,
+                  height: tab.height,
+                  element: { kind: 'ElementReference', name: elementName },
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+  });
+
+  return {
+    elements,
+    layout: {
+      kind: 'TabsLayout',
+      spec: { tabs: tabItems },
+    },
+  };
+}
