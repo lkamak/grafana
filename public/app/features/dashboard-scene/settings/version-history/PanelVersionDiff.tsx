@@ -80,7 +80,8 @@ export function PanelVersionDiff({ lhs, rhs }: PanelVersionDiffProps) {
                 styles.tile,
                 styles[tile.item.kind],
                 tile.variant === 'ghost' && styles.ghost,
-                isSelected && styles.selected
+                isSelected && styles.selected,
+                isSelected && tile.variant !== 'ghost' && styles.selectedCurrent
               )}
               style={gridStyle(tile.pos)}
               onClick={() => setSelectedId(tile.item.id)}
@@ -287,6 +288,8 @@ const getStyles = (theme: GrafanaTheme2) => ({
   }),
   selected: css({
     boxShadow: `0 0 0 1px ${theme.colors.primary.border}`,
+  }),
+  selectedCurrent: css({
     zIndex: 2,
   }),
   added: css({
