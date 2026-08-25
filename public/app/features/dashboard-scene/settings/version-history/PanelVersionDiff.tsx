@@ -170,7 +170,6 @@ function positionsOverlap(a: PanelGridPos, b: PanelGridPos): boolean {
 
 function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
   const placed: PanelGridPos[] = [];
-  const originals: PanelGridPos[] = [];
   const stayKeys = new Set<string>();
 
   for (const tile of tiles) {
@@ -180,13 +179,12 @@ function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
       continue;
     }
 
-    // Lock tiles that never shared a source slot so a tab-collision shift cannot
-    // cascade them off their true positions.
-    if (!originals.some((other) => positionsOverlap(tile.pos, other))) {
+    // Lock tiles that do not overlap any already-locked tile so a tab-collision
+    // shift cannot cascade them off their true positions.
+    if (!placed.some((other) => positionsOverlap(tile.pos, other))) {
       stayKeys.add(tile.key);
       placed.push(tile.pos);
     }
-    originals.push(tile.pos);
   }
 
   const withCurrentResolved = tiles.map((tile) => {
@@ -198,6 +196,14 @@ function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
     // tile cannot land under a panel that never shared its slot.
     return { ...tile, pos: placeWithoutOverlap(tile.pos, placed) };
   });
+
+  for (const tile of withCurrentResolved) {
+    if (tile.variant === 'ghost') {
+      // Ghosts stay at the move origin. Treat them as occupied so a shifted
+      // removal cannot cover the move-from marker.
+      placed.push(tile.pos);
+    }
+  }
 
   return withCurrentResolved.map((tile) => {
     if (tile.item.kind !== 'removed') {

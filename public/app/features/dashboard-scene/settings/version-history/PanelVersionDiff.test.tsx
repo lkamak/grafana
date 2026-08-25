@@ -163,6 +163,29 @@ describe('PanelVersionDiff', () => {
     expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Disk');
   });
 
+  it('does not cascade tab overlap shifts onto panels that only overlap a shifted tile', async () => {
+    const user = userEvent.setup();
+    const dashboard = tabsDashboard([
+      [
+        { id: 1, title: 'CPU', y: 0, height: 8 },
+        { id: 3, title: 'Disk', y: 8, height: 8 },
+      ],
+      { id: 2, title: 'Memory', y: 4, height: 8 },
+    ]);
+
+    render(<PanelVersionDiff lhs={dashboard} rhs={dashboard} />);
+
+    expect(screen.getByTestId('panel-version-diff-tile-1')).toHaveStyle({ gridRow: '1 / span 8' });
+    expect(screen.getByTestId('panel-version-diff-tile-2')).toHaveStyle({ gridRow: '17 / span 8' });
+    expect(screen.getByTestId('panel-version-diff-tile-3')).toHaveStyle({ gridRow: '9 / span 8' });
+
+    await user.click(screen.getByTestId('panel-version-diff-tile-2'));
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
+
+    await user.click(screen.getByTestId('panel-version-diff-tile-3'));
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Disk');
+  });
+
   it('keeps a panel at its destination when it moves into a slot freed by a removal', async () => {
     const user = userEvent.setup();
     const previous = {
@@ -195,6 +218,40 @@ describe('PanelVersionDiff', () => {
 
     await user.click(removed);
 
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('This panel was removed');
+  });
+
+  it('does not place a shifted removal on top of a move ghost', async () => {
+    const user = userEvent.setup();
+    const previous = {
+      panels: [
+        { id: 1, title: 'CPU', type: 'timeseries', gridPos: { x: 0, y: 0, w: 12, h: 8 } },
+        { id: 2, title: 'Memory', type: 'gauge', gridPos: { x: 0, y: 8, w: 12, h: 8 } },
+      ],
+    };
+    const next = {
+      panels: [{ id: 2, title: 'Memory', type: 'gauge', gridPos: { x: 0, y: 0, w: 12, h: 8 } }],
+    };
+
+    render(<PanelVersionDiff lhs={previous} rhs={next} />);
+
+    expect(screen.getByTestId('panel-version-diff-tile-2')).toHaveStyle({
+      gridColumn: '1 / span 12',
+      gridRow: '1 / span 8',
+    });
+    expect(screen.getByTestId('panel-version-diff-ghost-2')).toHaveStyle({
+      gridColumn: '1 / span 12',
+      gridRow: '9 / span 8',
+    });
+    expect(screen.getByTestId('panel-version-diff-tile-1')).toHaveStyle({
+      gridColumn: '1 / span 12',
+      gridRow: '17 / span 8',
+    });
+
+    await user.click(screen.getByTestId('panel-version-diff-ghost-2'));
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
+
+    await user.click(screen.getByTestId('panel-version-diff-tile-1'));
     expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('This panel was removed');
   });
 });
