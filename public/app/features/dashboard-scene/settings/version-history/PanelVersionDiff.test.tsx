@@ -140,6 +140,22 @@ describe('PanelVersionDiff', () => {
     expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
   });
 
+  it('does not cascade tab overlap shifts onto panels that never shared a slot', () => {
+    const dashboard = tabsDashboard([
+      [
+        { id: 1, title: 'CPU', y: 0, height: 8 },
+        { id: 3, title: 'Disk', y: 8, height: 8 },
+      ],
+      { id: 2, title: 'Memory', y: 0, height: 8 },
+    ]);
+
+    render(<PanelVersionDiff lhs={dashboard} rhs={dashboard} />);
+
+    expect(screen.getByTestId('panel-version-diff-tile-1')).toHaveStyle({ gridRow: '1 / span 8' });
+    expect(screen.getByTestId('panel-version-diff-tile-2')).toHaveStyle({ gridRow: '9 / span 8' });
+    expect(screen.getByTestId('panel-version-diff-tile-3')).toHaveStyle({ gridRow: '9 / span 8' });
+  });
+
   it('keeps a panel at its destination when it moves into a slot freed by a removal', async () => {
     const user = userEvent.setup();
     const previous = {
@@ -176,40 +192,43 @@ describe('PanelVersionDiff', () => {
   });
 });
 
-function tabsDashboard(tabs: Array<{ id: number; title: string; y: number; height: number }>) {
+type TabPanelFixture = { id: number; title: string; y: number; height: number };
+
+function tabsDashboard(tabs: Array<TabPanelFixture | TabPanelFixture[]>) {
   const elements: Record<string, unknown> = {};
   const tabItems = tabs.map((tab) => {
-    const elementName = `panel-${tab.id}`;
-    elements[elementName] = {
-      kind: 'Panel',
-      spec: {
-        id: tab.id,
-        title: tab.title,
-        vizConfig: { kind: 'VizConfig', group: 'timeseries', spec: { fieldConfig: { defaults: {} } } },
-        data: { kind: 'QueryGroup', spec: { queries: [] } },
-      },
-    };
+    const panels = Array.isArray(tab) ? tab : [tab];
+    const items = panels.map((panel) => {
+      const elementName = `panel-${panel.id}`;
+      elements[elementName] = {
+        kind: 'Panel',
+        spec: {
+          id: panel.id,
+          title: panel.title,
+          vizConfig: { kind: 'VizConfig', group: 'timeseries', spec: { fieldConfig: { defaults: {} } } },
+          data: { kind: 'QueryGroup', spec: { queries: [] } },
+        },
+      };
+
+      return {
+        kind: 'GridLayoutItem',
+        spec: {
+          x: 0,
+          y: panel.y,
+          width: 12,
+          height: panel.height,
+          element: { kind: 'ElementReference', name: elementName },
+        },
+      };
+    });
 
     return {
       kind: 'TabsLayoutTab',
       spec: {
-        title: tab.title,
+        title: panels[0].title,
         layout: {
           kind: 'GridLayout',
-          spec: {
-            items: [
-              {
-                kind: 'GridLayoutItem',
-                spec: {
-                  x: 0,
-                  y: tab.y,
-                  width: 12,
-                  height: tab.height,
-                  element: { kind: 'ElementReference', name: elementName },
-                },
-              },
-            ],
-          },
+          spec: { items },
         },
       },
     };

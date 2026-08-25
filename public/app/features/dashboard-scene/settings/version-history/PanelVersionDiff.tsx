@@ -169,7 +169,7 @@ function positionsOverlap(a: PanelGridPos, b: PanelGridPos): boolean {
 }
 
 function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
-  const placed: PanelGridPos[] = [];
+  const placed: Array<{ original: PanelGridPos; pos: PanelGridPos }> = [];
 
   const withCurrentResolved = tiles.map((tile) => {
     // Removed tiles mark the old layout. Treating them as blockers would push a
@@ -178,8 +178,15 @@ function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
       return tile;
     }
 
-    return { ...tile, pos: placeWithoutOverlap(tile.pos, placed) };
+    // Only source-data overlaps are blockers. A tile shifted to separate tab
+    // collisions must not cascade into panels that never shared a slot.
+    const blockers = placed.filter((other) => positionsOverlap(tile.pos, other.original)).map((other) => other.pos);
+    const pos = placeWithoutOverlap(tile.pos, blockers);
+    placed.push({ original: tile.pos, pos });
+    return { ...tile, pos };
   });
+
+  const placedPositions = placed.map((other) => other.pos);
 
   return withCurrentResolved.map((tile) => {
     if (tile.item.kind !== 'removed') {
@@ -188,7 +195,7 @@ function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
 
     // A current panel may now occupy the freed slot. Shift the removed tile so
     // the removal stays visible and clickable instead of sitting underneath.
-    return { ...tile, pos: placeWithoutOverlap(tile.pos, placed) };
+    return { ...tile, pos: placeWithoutOverlap(tile.pos, placedPositions) };
   });
 }
 
