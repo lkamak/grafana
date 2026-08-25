@@ -171,7 +171,9 @@ function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
   const placed: PanelGridPos[] = [];
 
   return tiles.map((tile) => {
-    if (tile.variant === 'ghost') {
+    // Removed tiles mark the old layout. Treating them as blockers would push a
+    // panel that reused the freed slot off its true destination (id-order dependent).
+    if (tile.variant === 'ghost' || tile.item.kind === 'removed') {
       return tile;
     }
 

@@ -123,6 +123,33 @@ describe('PanelVersionDiff', () => {
 
     expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
   });
+
+  it('keeps a panel at its destination when it moves into a slot freed by a removal', () => {
+    const previous = {
+      panels: [
+        { id: 1, title: 'CPU', type: 'timeseries', gridPos: { x: 0, y: 0, w: 12, h: 8 } },
+        { id: 2, title: 'Memory', type: 'gauge', gridPos: { x: 12, y: 0, w: 12, h: 8 } },
+      ],
+    };
+    const next = {
+      panels: [{ id: 2, title: 'Memory', type: 'gauge', gridPos: { x: 0, y: 0, w: 12, h: 8 } }],
+    };
+
+    render(<PanelVersionDiff lhs={previous} rhs={next} />);
+
+    expect(screen.getByTestId('panel-version-diff-tile-1')).toHaveStyle({
+      gridColumn: '1 / span 12',
+      gridRow: '1 / span 8',
+    });
+    expect(screen.getByTestId('panel-version-diff-tile-2')).toHaveStyle({
+      gridColumn: '1 / span 12',
+      gridRow: '1 / span 8',
+    });
+    expect(screen.getByTestId('panel-version-diff-ghost-2')).toHaveStyle({
+      gridColumn: '13 / span 12',
+      gridRow: '1 / span 8',
+    });
+  });
 });
 
 function tabsDashboard(tabs: Array<{ id: number; title: string; y: number; height: number }>) {
