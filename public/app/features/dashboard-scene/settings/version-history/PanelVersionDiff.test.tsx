@@ -103,4 +103,72 @@ describe('PanelVersionDiff', () => {
     expect(details).toHaveTextContent('80 → red');
     expect(details).toHaveTextContent('90 → red');
   });
+
+  it('places overlapping current tiles on separate rows so tab panels stay visible and clickable', async () => {
+    const user = userEvent.setup();
+    const dashboard = tabsDashboard([
+      { id: 1, title: 'CPU', y: 0, height: 8 },
+      { id: 2, title: 'Memory', y: 0, height: 8 },
+    ]);
+
+    render(<PanelVersionDiff lhs={dashboard} rhs={dashboard} />);
+
+    const cpu = screen.getByTestId('panel-version-diff-tile-1');
+    const memory = screen.getByTestId('panel-version-diff-tile-2');
+
+    expect(cpu).toHaveStyle({ gridRow: '1 / span 8' });
+    expect(memory).toHaveStyle({ gridRow: '9 / span 8' });
+
+    await user.click(memory);
+
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
+  });
 });
+
+function tabsDashboard(tabs: Array<{ id: number; title: string; y: number; height: number }>) {
+  const elements: Record<string, unknown> = {};
+  const tabItems = tabs.map((tab) => {
+    const elementName = `panel-${tab.id}`;
+    elements[elementName] = {
+      kind: 'Panel',
+      spec: {
+        id: tab.id,
+        title: tab.title,
+        vizConfig: { kind: 'VizConfig', group: 'timeseries', spec: { fieldConfig: { defaults: {} } } },
+        data: { kind: 'QueryGroup', spec: { queries: [] } },
+      },
+    };
+
+    return {
+      kind: 'TabsLayoutTab',
+      spec: {
+        title: tab.title,
+        layout: {
+          kind: 'GridLayout',
+          spec: {
+            items: [
+              {
+                kind: 'GridLayoutItem',
+                spec: {
+                  x: 0,
+                  y: tab.y,
+                  width: 12,
+                  height: tab.height,
+                  element: { kind: 'ElementReference', name: elementName },
+                },
+              },
+            ],
+          },
+        },
+      },
+    };
+  });
+
+  return {
+    elements,
+    layout: {
+      kind: 'TabsLayout',
+      spec: { tabs: tabItems },
+    },
+  };
+}

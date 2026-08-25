@@ -160,7 +160,30 @@ function buildTiles(items: PanelVersionDiffItem[]): Tile[] {
     }
   }
 
-  return tiles;
+  return resolveCurrentTileOverlaps(tiles);
+}
+
+function positionsOverlap(a: PanelGridPos, b: PanelGridPos): boolean {
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
+  const placed: PanelGridPos[] = [];
+
+  return tiles.map((tile) => {
+    if (tile.variant === 'ghost') {
+      return tile;
+    }
+
+    const pos = { ...tile.pos };
+    let blocker = placed.find((other) => positionsOverlap(pos, other));
+    while (blocker) {
+      pos.y = blocker.y + blocker.h;
+      blocker = placed.find((other) => positionsOverlap(pos, other));
+    }
+    placed.push(pos);
+    return { ...tile, pos };
+  });
 }
 
 function gridStyle(pos: PanelGridPos): CSSProperties {
