@@ -1,7 +1,9 @@
 import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { type Props } from 'react-virtualized-auto-sizer';
 
 import { EventBusSrv, serializeStateToUrlParam } from '@grafana/data';
+import { selectors } from '@grafana/e2e-selectors';
 
 import { makeLogsQueryResponse } from './helper/query';
 import { setupExplore, tearDown, waitForExplore } from './helper/setup';
@@ -36,6 +38,22 @@ describe('Explore: handle running/not running query', () => {
     await waitForExplore();
 
     expect(datasources.loki.query).not.toBeCalled();
+  });
+
+  it('shows a dismissible helper callout on first load without blocking Explore', async () => {
+    const user = userEvent.setup();
+    setupExplore();
+    await waitForExplore();
+
+    const callout = screen.getByRole('status', { name: 'Lightbox demo' });
+    expect(callout).toBeInTheDocument();
+    expect(callout).toHaveTextContent('Try a query here. This environment is for the workshop.');
+    expect(screen.getByTestId(selectors.components.DataSourcePicker.container)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Close alert' }));
+
+    expect(screen.queryByRole('status', { name: 'Lightbox demo' })).not.toBeInTheDocument();
+    expect(screen.getByTestId(selectors.components.DataSourcePicker.container)).toBeInTheDocument();
   });
 
   it('runs query when initial state contains query and renders results', async () => {

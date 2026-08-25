@@ -3,7 +3,7 @@ import { useEffect } from 'react';
 
 import { type GrafanaTheme2, PageLayoutType } from '@grafana/data';
 import { t, Trans } from '@grafana/i18n';
-import { ErrorBoundaryAlert, LoadingPlaceholder, useStyles2, useTheme2 } from '@grafana/ui';
+import { ErrorBoundaryAlert, LoadingPlaceholder, useStyles2 } from '@grafana/ui';
 import { SplitPaneWrapper } from 'app/core/components/SplitPaneWrapper/SplitPaneWrapper';
 import { useGrafana } from 'app/core/context/GrafanaContext';
 import { useNavModel } from 'app/core/hooks/useNavModel';
@@ -16,6 +16,7 @@ import { Page } from '../../core/components/Page/Page';
 import { CorrelationEditorModeBar } from './CorrelationEditorModeBar';
 import { ExploreActions } from './ExploreActions';
 import { ExploreDrawer } from './ExploreDrawer';
+import { ExploreHelperCallout } from './ExploreHelperCallout';
 import { ExplorePaneContainer } from './ExplorePaneContainer';
 import { useQueriesDrawerContext } from './QueriesDrawer/QueriesDrawerContext';
 import RichHistoryContainer from './RichHistory/RichHistoryContainer';
@@ -35,7 +36,6 @@ export default function ExplorePage(props: GrafanaRouteComponentProps<{}, Explor
 
 function ExplorePageContent(props: GrafanaRouteComponentProps<{}, ExploreQueryParams>) {
   const styles = useStyles2(getStyles);
-  const theme = useTheme2();
   useTimeSrvFix();
   useStateSync(props.queryParams);
   // We want  to set the title according to the URL and not to the state because the URL itself may lag
@@ -76,30 +76,32 @@ function ExplorePageContent(props: GrafanaRouteComponentProps<{}, ExploreQueryPa
           <Trans i18nKey="nav.explore.title">Explore</Trans>
         </h1>
         <ExploreActions />
+        <ExploreHelperCallout />
         {showCorrelationEditorBar && <CorrelationEditorModeBar panes={panes} />}
-        <SplitPaneWrapper
-          splitOrientation="vertical"
-          paneSize={widthCalc}
-          minSize={MIN_PANE_WIDTH}
-          maxSize={MIN_PANE_WIDTH * -1}
-          primary="second"
-          splitVisible={hasSplit}
-          parentStyle={showCorrelationEditorBar ? { height: `calc(100% - ${theme.spacing(6)}` } : {}} // button = 4, padding = 1 x 2
-          paneStyle={{ overflow: 'auto', display: 'flex', flexDirection: 'column' }}
-          onDragFinished={(size) => size && updateSplitSize(size)}
-        >
-          {panes.map(([exploreId, pane]) => {
-            return (
-              <ErrorBoundaryAlert boundaryName="explore-pane" key={exploreId} style="page">
-                {pane.initialized ? (
-                  <ExplorePaneContainer exploreId={exploreId} />
-                ) : (
-                  <LoadingPlaceholder text={t('explore.pane.loading-placeholder', 'Loading...')} />
-                )}
-              </ErrorBoundaryAlert>
-            );
-          })}
-        </SplitPaneWrapper>
+        <div className={styles.splitPaneContainer}>
+          <SplitPaneWrapper
+            splitOrientation="vertical"
+            paneSize={widthCalc}
+            minSize={MIN_PANE_WIDTH}
+            maxSize={MIN_PANE_WIDTH * -1}
+            primary="second"
+            splitVisible={hasSplit}
+            paneStyle={{ overflow: 'auto', display: 'flex', flexDirection: 'column' }}
+            onDragFinished={(size) => size && updateSplitSize(size)}
+          >
+            {panes.map(([exploreId, pane]) => {
+              return (
+                <ErrorBoundaryAlert boundaryName="explore-pane" key={exploreId} style="page">
+                  {pane.initialized ? (
+                    <ExplorePaneContainer exploreId={exploreId} />
+                  ) : (
+                    <LoadingPlaceholder text={t('explore.pane.loading-placeholder', 'Loading...')} />
+                  )}
+                </ErrorBoundaryAlert>
+              );
+            })}
+          </SplitPaneWrapper>
+        </div>
         {drawerOpened && (
           <ExploreDrawer>
             <RichHistoryContainer
@@ -123,6 +125,13 @@ const getStyles = (theme: GrafanaTheme2) => {
       height: '100%',
       position: 'relative',
       overflow: 'hidden',
+      display: 'flex',
+      flexDirection: 'column',
+    }),
+    splitPaneContainer: css({
+      flex: 1,
+      minHeight: 0,
+      position: 'relative',
     }),
     correlationsEditorIndicator: css({
       borderLeft: `4px solid ${theme.colors.primary.main}`,
