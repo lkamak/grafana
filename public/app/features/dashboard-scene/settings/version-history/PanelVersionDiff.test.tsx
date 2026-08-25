@@ -124,7 +124,8 @@ describe('PanelVersionDiff', () => {
     expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
   });
 
-  it('keeps a panel at its destination when it moves into a slot freed by a removal', () => {
+  it('keeps a panel at its destination when it moves into a slot freed by a removal', async () => {
+    const user = userEvent.setup();
     const previous = {
       panels: [
         { id: 1, title: 'CPU', type: 'timeseries', gridPos: { x: 0, y: 0, w: 12, h: 8 } },
@@ -137,18 +138,25 @@ describe('PanelVersionDiff', () => {
 
     render(<PanelVersionDiff lhs={previous} rhs={next} />);
 
-    expect(screen.getByTestId('panel-version-diff-tile-1')).toHaveStyle({
+    const removed = screen.getByTestId('panel-version-diff-tile-1');
+    const moved = screen.getByTestId('panel-version-diff-tile-2');
+
+    expect(moved).toHaveStyle({
       gridColumn: '1 / span 12',
       gridRow: '1 / span 8',
     });
-    expect(screen.getByTestId('panel-version-diff-tile-2')).toHaveStyle({
+    expect(removed).toHaveStyle({
       gridColumn: '1 / span 12',
-      gridRow: '1 / span 8',
+      gridRow: '9 / span 8',
     });
     expect(screen.getByTestId('panel-version-diff-ghost-2')).toHaveStyle({
       gridColumn: '13 / span 12',
       gridRow: '1 / span 8',
     });
+
+    await user.click(removed);
+
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('This panel was removed');
   });
 });
 

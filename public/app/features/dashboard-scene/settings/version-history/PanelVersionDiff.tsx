@@ -170,22 +170,36 @@ function positionsOverlap(a: PanelGridPos, b: PanelGridPos): boolean {
 function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
   const placed: PanelGridPos[] = [];
 
-  return tiles.map((tile) => {
+  const withCurrentResolved = tiles.map((tile) => {
     // Removed tiles mark the old layout. Treating them as blockers would push a
     // panel that reused the freed slot off its true destination.
     if (tile.variant === 'ghost' || tile.item.kind === 'removed') {
       return tile;
     }
 
-    const pos = { ...tile.pos };
-    let blocker = placed.find((other) => positionsOverlap(pos, other));
-    while (blocker) {
-      pos.y = blocker.y + blocker.h;
-      blocker = placed.find((other) => positionsOverlap(pos, other));
-    }
-    placed.push(pos);
-    return { ...tile, pos };
+    return { ...tile, pos: placeWithoutOverlap(tile.pos, placed) };
   });
+
+  return withCurrentResolved.map((tile) => {
+    if (tile.item.kind !== 'removed') {
+      return tile;
+    }
+
+    // A current panel may now occupy the freed slot. Shift the removed tile so
+    // the removal stays visible and clickable instead of sitting underneath.
+    return { ...tile, pos: placeWithoutOverlap(tile.pos, placed) };
+  });
+}
+
+function placeWithoutOverlap(pos: PanelGridPos, placed: PanelGridPos[]): PanelGridPos {
+  const next = { ...pos };
+  let blocker = placed.find((other) => positionsOverlap(next, other));
+  while (blocker) {
+    next.y = blocker.y + blocker.h;
+    blocker = placed.find((other) => positionsOverlap(next, other));
+  }
+  placed.push(next);
+  return next;
 }
 
 function gridStyle(pos: PanelGridPos): CSSProperties {
