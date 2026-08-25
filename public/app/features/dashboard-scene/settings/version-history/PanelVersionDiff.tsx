@@ -169,24 +169,35 @@ function positionsOverlap(a: PanelGridPos, b: PanelGridPos): boolean {
 }
 
 function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
-  const placed: Array<{ original: PanelGridPos; pos: PanelGridPos }> = [];
+  const placed: PanelGridPos[] = [];
+  const originals: PanelGridPos[] = [];
+  const stayKeys = new Set<string>();
 
-  const withCurrentResolved = tiles.map((tile) => {
+  for (const tile of tiles) {
     // Removed tiles mark the old layout. Treating them as blockers would push a
     // panel that reused the freed slot off its true destination.
     if (tile.variant === 'ghost' || tile.item.kind === 'removed') {
+      continue;
+    }
+
+    // Lock tiles that never shared a source slot so a tab-collision shift cannot
+    // cascade them off their true positions.
+    if (!originals.some((other) => positionsOverlap(tile.pos, other))) {
+      stayKeys.add(tile.key);
+      placed.push(tile.pos);
+    }
+    originals.push(tile.pos);
+  }
+
+  const withCurrentResolved = tiles.map((tile) => {
+    if (tile.variant === 'ghost' || tile.item.kind === 'removed' || stayKeys.has(tile.key)) {
       return tile;
     }
 
-    // Only source-data overlaps are blockers. A tile shifted to separate tab
-    // collisions must not cascade into panels that never shared a slot.
-    const blockers = placed.filter((other) => positionsOverlap(tile.pos, other.original)).map((other) => other.pos);
-    const pos = placeWithoutOverlap(tile.pos, blockers);
-    placed.push({ original: tile.pos, pos });
-    return { ...tile, pos };
+    // Avoid every already-placed cell, not just source overlaps, so a shifted
+    // tile cannot land under a panel that never shared its slot.
+    return { ...tile, pos: placeWithoutOverlap(tile.pos, placed) };
   });
-
-  const placedPositions = placed.map((other) => other.pos);
 
   return withCurrentResolved.map((tile) => {
     if (tile.item.kind !== 'removed') {
@@ -195,7 +206,7 @@ function resolveCurrentTileOverlaps(tiles: Tile[]): Tile[] {
 
     // A current panel may now occupy the freed slot. Shift the removed tile so
     // the removal stays visible and clickable instead of sitting underneath.
-    return { ...tile, pos: placeWithoutOverlap(tile.pos, placedPositions) };
+    return { ...tile, pos: placeWithoutOverlap(tile.pos, placed) };
   });
 }
 

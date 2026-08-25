@@ -140,7 +140,8 @@ describe('PanelVersionDiff', () => {
     expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
   });
 
-  it('does not cascade tab overlap shifts onto panels that never shared a slot', () => {
+  it('does not cascade tab overlap shifts onto panels that never shared a slot', async () => {
+    const user = userEvent.setup();
     const dashboard = tabsDashboard([
       [
         { id: 1, title: 'CPU', y: 0, height: 8 },
@@ -152,8 +153,14 @@ describe('PanelVersionDiff', () => {
     render(<PanelVersionDiff lhs={dashboard} rhs={dashboard} />);
 
     expect(screen.getByTestId('panel-version-diff-tile-1')).toHaveStyle({ gridRow: '1 / span 8' });
-    expect(screen.getByTestId('panel-version-diff-tile-2')).toHaveStyle({ gridRow: '9 / span 8' });
+    expect(screen.getByTestId('panel-version-diff-tile-2')).toHaveStyle({ gridRow: '17 / span 8' });
     expect(screen.getByTestId('panel-version-diff-tile-3')).toHaveStyle({ gridRow: '9 / span 8' });
+
+    await user.click(screen.getByTestId('panel-version-diff-tile-2'));
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Memory');
+
+    await user.click(screen.getByTestId('panel-version-diff-tile-3'));
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Disk');
   });
 
   it('keeps a panel at its destination when it moves into a slot freed by a removal', async () => {
