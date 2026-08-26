@@ -117,8 +117,8 @@ describe('PanelVersionDiff', () => {
 
     render(<PanelVersionDiff lhs={dashboard} rhs={dashboard} />);
 
-    const cpu = screen.getByTestId('panel-version-diff-tile-panel-1');
-    const memory = screen.getByTestId('panel-version-diff-tile-panel-2');
+    const cpu = screen.getByTestId('panel-version-diff-tile-1');
+    const memory = screen.getByTestId('panel-version-diff-tile-2');
 
     expect(screen.getByTestId('panel-version-diff-section-tab:0')).toBeInTheDocument();
     expect(screen.getByTestId('panel-version-diff-section-tab:1')).toBeInTheDocument();
@@ -155,6 +155,32 @@ describe('PanelVersionDiff', () => {
       gridColumn: '13 / span 12',
       gridRow: '1 / span 8',
     });
+  });
+
+  it('keeps a removed panel above a panel that reused its slot so the removal stays clickable', async () => {
+    const user = userEvent.setup();
+    const previous = {
+      panels: [
+        { id: 1, title: 'CPU', type: 'timeseries', gridPos: { x: 0, y: 0, w: 12, h: 8 } },
+        { id: 2, title: 'Memory', type: 'gauge', gridPos: { x: 12, y: 0, w: 12, h: 8 } },
+      ],
+    };
+    const next = {
+      panels: [{ id: 2, title: 'Memory', type: 'gauge', gridPos: { x: 0, y: 0, w: 12, h: 8 } }],
+    };
+
+    render(<PanelVersionDiff lhs={previous} rhs={next} />);
+
+    const removed = screen.getByTestId('panel-version-diff-tile-1');
+    const destination = screen.getByTestId('panel-version-diff-tile-2');
+
+    expect(Number(window.getComputedStyle(removed).zIndex)).toBeGreaterThan(
+      Number(window.getComputedStyle(destination).zIndex)
+    );
+
+    await user.click(removed);
+
+    expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('This panel was removed.');
   });
 });
 

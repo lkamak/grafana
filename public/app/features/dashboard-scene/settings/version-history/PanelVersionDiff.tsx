@@ -340,7 +340,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
   }),
   selected: css({
     boxShadow: `0 0 0 1px ${theme.colors.primary.border}`,
-    zIndex: 2,
+    zIndex: 3,
   }),
   added: css({
     borderColor: theme.colors.success.border,
@@ -349,7 +349,7 @@ const getStyles = (theme: GrafanaTheme2) => ({
   removed: css({
     borderColor: theme.colors.error.border,
     background: theme.colors.error.transparent,
-    zIndex: 0,
+    zIndex: 2,
   }),
   changed: css({
     borderColor: theme.colors.warning.border,

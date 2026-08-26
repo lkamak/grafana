@@ -149,7 +149,7 @@ describe('extractPanels', () => {
     });
 
     expect(panels[0].section.kind).toBe('list');
-    expect(panels[0].id).toBe('panel-1');
+    expect(panels[0].id).toBe('1');
   });
 });
 
@@ -250,9 +250,9 @@ describe('diffDashboardPanels', () => {
     const diff = diffDashboardPanels(lhs, rhs);
     const byId = Object.fromEntries(diff.map((item) => [item.id, item]));
 
-    expect(byId['panel-1'].kind).toBe('moved');
-    expect(byId['panel-2'].kind).toBe('unchanged');
-    expect(byId['panel-2'].changes).toEqual([]);
+    expect(byId['1'].kind).toBe('moved');
+    expect(byId['2'].kind).toBe('unchanged');
+    expect(byId['2'].changes).toEqual([]);
   });
 
   it('groups tab panels into separate sections', () => {
@@ -263,8 +263,8 @@ describe('diffDashboardPanels', () => {
     const sections = groupDiffItemsBySection(diffDashboardPanels(dashboard, dashboard));
 
     expect(sections.map((section) => section.key)).toEqual(['tab:0', 'tab:1']);
-    expect(sections[0].items.map((item) => item.id)).toEqual(['panel-1']);
-    expect(sections[1].items.map((item) => item.id)).toEqual(['panel-2']);
+    expect(sections[0].items.map((item) => item.id)).toEqual(['1']);
+    expect(sections[1].items.map((item) => item.id)).toEqual(['2']);
   });
 
   it('treats a tab change as a layout move', () => {
@@ -277,11 +277,67 @@ describe('diffDashboardPanels', () => {
       { id: 1, title: 'CPU', y: 0, height: 8 },
     ]);
 
-    const [cpu] = diffDashboardPanels(lhs, rhs).filter((item) => item.id === 'panel-1');
+    const [cpu] = diffDashboardPanels(lhs, rhs).filter((item) => item.id === '1');
     expect(cpu.kind).toBe('moved');
     expect(cpu.changes.map((change) => change.field)).toEqual(['layout']);
     expect(cpu.base?.section.key).toBe('tab:0');
     expect(cpu.next?.section.key).toBe('tab:1');
+  });
+
+  it('matches v1 numeric panel ids with v2 panel-${id} element names', () => {
+    const lhs = {
+      panels: [
+        {
+          id: 1,
+          title: 'CPU',
+          type: 'timeseries',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+          targets: [{ expr: 'up' }],
+        },
+      ],
+    };
+    const rhs = {
+      elements: {
+        'panel-1': {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'CPU usage',
+            vizConfig: { kind: 'VizConfig', group: 'timeseries', spec: { fieldConfig: { defaults: {} } } },
+            data: {
+              kind: 'QueryGroup',
+              spec: {
+                queries: [{ kind: 'PanelQuery', spec: { refId: 'A', query: { spec: { expr: 'up' } } } }],
+              },
+            },
+          },
+        },
+      },
+      layout: {
+        kind: 'GridLayout',
+        spec: {
+          items: [
+            {
+              kind: 'GridLayoutItem',
+              spec: {
+                x: 0,
+                y: 0,
+                width: 12,
+                height: 8,
+                element: { kind: 'ElementReference', name: 'panel-1' },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    const diff = diffDashboardPanels(lhs, rhs);
+
+    expect(diff).toHaveLength(1);
+    expect(diff[0].id).toBe('1');
+    expect(diff[0].kind).toBe('changed');
+    expect(diff[0].changes.map((change) => change.field)).toEqual(['title']);
   });
 });
 

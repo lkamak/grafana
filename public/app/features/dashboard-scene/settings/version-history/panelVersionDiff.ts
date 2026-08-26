@@ -317,7 +317,7 @@ function snapshotFromV2Panel(
   const title = typeof spec.title === 'string' ? spec.title : '';
 
   return {
-    id: elementName ?? panelIdFromUnknown(spec.id, title, type),
+    id: panelIdFromUnknown(elementName ?? spec.id, title, type),
     title,
     type,
     gridPos,
@@ -468,7 +468,9 @@ export function formatLayout(snapshot: PanelSnapshot): string {
 
 function panelIdFromUnknown(id: unknown, title: unknown, type: unknown): string {
   if (typeof id === 'number' || typeof id === 'string') {
-    return String(id);
+    const raw = String(id);
+    const prefixed = /^panel-(\d+)$/.exec(raw);
+    return prefixed ? prefixed[1] : raw;
   }
   return `untitled:${String(title ?? '')}:${String(type ?? '')}`;
 }
