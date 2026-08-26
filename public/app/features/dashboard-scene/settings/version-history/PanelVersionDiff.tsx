@@ -208,13 +208,15 @@ function PanelTile({
         styles.tile,
         styles[tile.item.kind],
         tile.variant === 'ghost' && styles.ghost,
-        selected && styles.selected,
+        selected && tile.variant !== 'ghost' && styles.selected,
         layout === 'list' && styles.listTile
       )}
       style={layout === 'grid' ? gridStyle(tile.pos) : undefined}
       onClick={() => onSelect(tile.item.id)}
       data-testid={
-        tile.variant === 'ghost' ? `panel-version-diff-ghost-${tile.item.id}` : `panel-version-diff-tile-${tile.item.id}`
+        tile.variant === 'ghost'
+          ? `panel-version-diff-ghost-${tile.item.id}`
+          : `panel-version-diff-tile-${tile.item.id}`
       }
       aria-pressed={selected}
     >

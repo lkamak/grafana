@@ -78,6 +78,10 @@ describe('PanelVersionDiff', () => {
 
     expect(Number(window.getComputedStyle(ghost).zIndex)).toBeLessThan(Number(window.getComputedStyle(added).zIndex));
 
+    await user.click(screen.getByTestId('panel-version-diff-tile-2'));
+
+    expect(Number(window.getComputedStyle(ghost).zIndex)).toBeLessThan(Number(window.getComputedStyle(added).zIndex));
+
     await user.click(added);
 
     expect(screen.getByTestId('panel-version-diff-details')).toHaveTextContent('Errors');
