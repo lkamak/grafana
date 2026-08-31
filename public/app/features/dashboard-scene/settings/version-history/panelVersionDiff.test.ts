@@ -109,6 +109,64 @@ describe('panelVersionDiff', () => {
     expect(panels[0].title).toBe('Nested');
   });
 
+  it('shifts panels after a collapsed v1 row so they do not overlap hidden children', () => {
+    const dashboard = {
+      panels: [
+        {
+          type: 'row',
+          title: 'Overview',
+          collapsed: true,
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          panels: [
+            {
+              id: 1,
+              title: 'Inside row',
+              type: 'stat',
+              gridPos: { x: 0, y: 1, w: 12, h: 8 },
+            },
+          ],
+        },
+        {
+          id: 2,
+          title: 'After row',
+          type: 'stat',
+          gridPos: { x: 0, y: 1, w: 12, h: 8 },
+        },
+      ],
+    };
+
+    const panels = extractPanels(dashboard);
+    expect(panels).toHaveLength(2);
+    expect(panels[0].id).toBe('1');
+    expect(panels[0].gridPos.y).toBe(1);
+    expect(panels[1].id).toBe('2');
+    expect(panels[1].gridPos.y).toBe(9);
+  });
+
+  it('does not treat collapse-only layout shifts as panel moves', () => {
+    const expanded = {
+      panels: [
+        { type: 'row', collapsed: false, gridPos: { x: 0, y: 0, w: 24, h: 1 }, panels: [] },
+        { id: 1, title: 'Inside', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } },
+        { id: 2, title: 'After', type: 'stat', gridPos: { x: 0, y: 9, w: 12, h: 8 } },
+      ],
+    };
+    const collapsed = {
+      panels: [
+        {
+          type: 'row',
+          collapsed: true,
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          panels: [{ id: 1, title: 'Inside', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } }],
+        },
+        { id: 2, title: 'After', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } },
+      ],
+    };
+
+    const diff = diffDashboardPanels(expanded, collapsed);
+    expect(diff.every((item) => item.kind === 'unchanged')).toBe(true);
+  });
+
   it('extracts panels from v2 grid layout', () => {
     const dashboard = {
       elements: {
@@ -195,6 +253,79 @@ describe('panelVersionDiff', () => {
     expect(extractPanels(dashboard, 'tab-one')).toHaveLength(1);
     expect(extractPanels(dashboard, 'tab-one')[0].title).toBe('Tab one panel');
     expect(extractPanels(dashboard, 'tab-two')).toHaveLength(1);
+    expect(extractPanels(dashboard, 'tab-two')[0].title).toBe('Tab two panel');
+  });
+
+  it('lists tabs nested inside a rows layout', () => {
+    const dashboard = {
+      elements: {
+        panelA: {
+          spec: {
+            title: 'Tab one panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+        panelB: {
+          spec: {
+            title: 'Tab two panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+      },
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            {
+              spec: {
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        metadata: { name: 'tab-one' },
+                        spec: {
+                          title: 'Overview',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'panelA' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                      {
+                        metadata: { name: 'tab-two' },
+                        spec: {
+                          title: 'Details',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'panelB' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(listDashboardTabs(dashboard)).toEqual([
+      { id: 'tab-one', title: 'Overview' },
+      { id: 'tab-two', title: 'Details' },
+    ]);
+
+    expect(extractPanels(dashboard)).toHaveLength(0);
+    expect(extractPanels(dashboard, 'tab-one')).toHaveLength(1);
+    expect(extractPanels(dashboard, 'tab-one')[0].title).toBe('Tab one panel');
     expect(extractPanels(dashboard, 'tab-two')[0].title).toBe('Tab two panel');
   });
 

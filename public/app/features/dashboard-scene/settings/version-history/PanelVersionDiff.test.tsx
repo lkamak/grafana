@@ -70,6 +70,31 @@ describe('PanelVersionDiff', () => {
     expect(screen.getByTestId(selectors.pages.Dashboard.Settings.Versions.newCanvas)).toBeInTheDocument();
   });
 
+  it('does not overlap tiles after a collapsed v1 row', () => {
+    const collapsedDashboard = {
+      panels: [
+        {
+          type: 'row',
+          collapsed: true,
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          panels: [{ id: 1, title: 'Inside row', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 }, targets: [] }],
+        },
+        { id: 2, title: 'After row', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 }, targets: [] },
+      ],
+    };
+
+    renderDiff({
+      lhs: collapsedDashboard,
+      rhs: collapsedDashboard,
+    });
+
+    const inside = screen.getByTestId(selectors.pages.Dashboard.Settings.Versions.panelTile('1', 'base'));
+    const after = screen.getByTestId(selectors.pages.Dashboard.Settings.Versions.panelTile('2', 'base'));
+
+    expect(inside.style.gridRow).toBe('2 / span 8');
+    expect(after.style.gridRow).toBe('10 / span 8');
+  });
+
   it('shows added panel only on the newer canvas', () => {
     renderDiff();
 
@@ -175,5 +200,82 @@ describe('PanelVersionDiff', () => {
 
     expect(screen.queryByText('Overview panel')).not.toBeInTheDocument();
     expect(screen.getAllByText('Details panel')).toHaveLength(2);
+  });
+
+  it('renders a tab picker for tabs nested inside a rows layout', () => {
+    const nestedTabDashboard = () => ({
+      elements: {
+        'panel-overview': {
+          spec: {
+            title: 'Overview panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+        'panel-details': {
+          spec: {
+            title: 'Details panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+      },
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            {
+              spec: {
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        metadata: { name: 'overview' },
+                        spec: {
+                          title: 'Overview',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [
+                                { spec: { element: { name: 'panel-overview' }, x: 0, y: 0, width: 12, height: 8 } },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                      {
+                        metadata: { name: 'details' },
+                        spec: {
+                          title: 'Details',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [
+                                { spec: { element: { name: 'panel-details' }, x: 0, y: 0, width: 12, height: 8 } },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    renderDiff({
+      lhs: nestedTabDashboard(),
+      rhs: nestedTabDashboard(),
+    });
+
+    expect(screen.queryByText('No panels to compare in these versions.')).not.toBeInTheDocument();
+    expect(screen.getByTestId(selectors.pages.Dashboard.Settings.Versions.tabPicker)).toBeInTheDocument();
+    expect(screen.getAllByText('Overview panel')).toHaveLength(2);
+    expect(screen.queryByText('Details panel')).not.toBeInTheDocument();
   });
 });

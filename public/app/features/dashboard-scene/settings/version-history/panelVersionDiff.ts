@@ -177,6 +177,10 @@ function diffPanelFields(base: PanelSnapshot, next: PanelSnapshot): PanelFieldCh
 
 function collectV1Panels(panels: unknown[]): PanelSnapshot[] {
   const snapshots: PanelSnapshot[] = [];
+  // Collapsed v1 rows keep child gridPos at the expanded coordinates while later
+  // panels are shifted up into those cells. Re-apply the hidden height so tiles
+  // stack as they would after expand, instead of overlapping.
+  let yShift = 0;
 
   const walk = (items: unknown[]) => {
     for (const item of items) {
@@ -184,17 +188,40 @@ function collectV1Panels(panels: unknown[]): PanelSnapshot[] {
         continue;
       }
       if (item.type === 'row') {
-        if (Array.isArray(item.panels)) {
-          walk(item.panels);
+        const rowPanels = Array.isArray(item.panels) ? item.panels : [];
+        walk(rowPanels);
+        if (item.collapsed === true) {
+          yShift += collapsedRowPushDown(item, rowPanels);
         }
         continue;
       }
-      snapshots.push(snapshotFromV1Panel(item));
+      const snapshot = snapshotFromV1Panel(item);
+      if (yShift !== 0) {
+        snapshot.gridPos = { ...snapshot.gridPos, y: snapshot.gridPos.y + yShift };
+      }
+      snapshots.push(snapshot);
     }
   };
 
   walk(panels);
   return snapshots;
+}
+
+function collapsedRowPushDown(row: Record<string, unknown>, rowPanels: unknown[]): number {
+  if (rowPanels.length === 0) {
+    return 0;
+  }
+
+  const rowY = isRecord(row.gridPos) ? readNumber(row.gridPos.y, 0) : 0;
+  let yMax = rowY + 1;
+  for (const child of rowPanels) {
+    if (!isRecord(child)) {
+      continue;
+    }
+    const pos = readGridPos(child.gridPos);
+    yMax = Math.max(yMax, pos.y + pos.h);
+  }
+  return Math.max(0, yMax - rowY - 1);
 }
 
 function snapshotFromV1Panel(panel: Record<string, unknown>): PanelSnapshot {
@@ -313,11 +340,34 @@ function walkV2Layout(
 }
 
 function readTabsLayoutTabs(layout: unknown): unknown[] | undefined {
-  if (!isRecord(layout) || layout.kind !== 'TabsLayout') {
-    return undefined;
+  const tabs = collectTabsFromLayout(layout);
+  return tabs.length > 0 ? tabs : undefined;
+}
+
+function collectTabsFromLayout(layout: unknown): unknown[] {
+  if (!isRecord(layout)) {
+    return [];
   }
+
   const spec = isRecord(layout.spec) ? layout.spec : layout;
-  return Array.isArray(spec.tabs) ? spec.tabs : undefined;
+
+  if (layout.kind === 'TabsLayout' && Array.isArray(spec.tabs)) {
+    return spec.tabs;
+  }
+
+  if (layout.kind === 'RowsLayout' && Array.isArray(spec.rows)) {
+    const tabs: unknown[] = [];
+    for (const row of spec.rows) {
+      if (!isRecord(row)) {
+        continue;
+      }
+      const rowSpec = isRecord(row.spec) ? row.spec : row;
+      tabs.push(...collectTabsFromLayout(rowSpec.layout));
+    }
+    return tabs;
+  }
+
+  return [];
 }
 
 function tabToId(tab: unknown, index: number): string {
