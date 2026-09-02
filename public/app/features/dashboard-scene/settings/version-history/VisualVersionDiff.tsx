@@ -25,7 +25,6 @@ type VisualVersionDiffProps = {
 const FILTERS: VisualPanelChangeKind[] = ['changed', 'added', 'removed', 'layout-only'];
 
 export function VisualVersionDiff({ lhs, rhs, sharedTimeRange, hasMigratedToV2 }: VisualVersionDiffProps) {
-  const styles = useStyles2(getStyles);
   const visualDiff = useMemo(() => getVisualDashboardDiff(lhs, rhs), [lhs, rhs]);
   const [activeFilters, setActiveFilters] = useState<Set<VisualPanelChangeKind>>(
     () => new Set(['changed', 'added', 'removed'])

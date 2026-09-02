@@ -46,8 +46,9 @@ function buildV1PreviewScene(
 
   const source = isRecord(sourceDashboard) ? sourceDashboard : {};
   const dashboard: DashboardDataDTO = {
+    // Spread may be a partial revision object; force through unknown for a minimal preview model.
     // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-    ...(source as DashboardDataDTO),
+    ...(source as unknown as DashboardDataDTO),
     title: typeof source.title === 'string' ? source.title : 'Version preview',
     panels: [panel],
     time: {
