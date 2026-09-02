@@ -226,6 +226,8 @@ function collectV2Layouts(layout: unknown, acc = new Map<string, unknown>()): Ma
           y: item.spec.y,
           width: item.spec.width,
           height: item.spec.height,
+          // v2 repeat lives on the layout item, not the panel body
+          ...('repeat' in item.spec ? { repeat: item.spec.repeat } : {}),
         });
       } else {
         acc.set(elementName, {

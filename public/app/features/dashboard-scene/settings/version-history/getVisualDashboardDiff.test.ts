@@ -212,6 +212,58 @@ describe('getVisualDashboardDiff', () => {
     ]);
   });
 
+  it('classifies layout-only when only GridLayout item repeat changes', () => {
+    const element = {
+      kind: 'Panel',
+      spec: {
+        id: 1,
+        title: 'V2 Panel',
+        description: '',
+        links: [],
+        data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+        vizConfig: {
+          kind: 'VizConfig',
+          group: 'timeseries',
+          version: '',
+          spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+        },
+      },
+    };
+    const gridItem = {
+      kind: 'GridLayoutItem',
+      spec: { x: 0, y: 0, width: 12, height: 8, element: { kind: 'ElementReference', name: 'panel-1' } },
+    };
+    const lhs = {
+      title: 'V2',
+      elements: { 'panel-1': element },
+      layout: {
+        kind: 'GridLayout',
+        spec: { items: [gridItem] },
+      },
+    };
+    const rhs = {
+      title: 'V2',
+      elements: { 'panel-1': structuredClone(element) },
+      layout: {
+        kind: 'GridLayout',
+        spec: {
+          items: [
+            {
+              ...gridItem,
+              spec: { ...gridItem.spec, repeat: { mode: 'variable', value: 'server' } },
+            },
+          ],
+        },
+      },
+    };
+
+    const result = getVisualDashboardDiff(lhs, rhs);
+
+    expect(result.panels).toEqual([
+      expect.objectContaining({ key: 'panel-1', kind: 'layout-only', title: 'V2 Panel', type: 'timeseries' }),
+    ]);
+  });
+
   it('handles mixed v1↔v2 history with title fallback and migration flag', () => {
     const lhs = {
       title: 'Old format',
