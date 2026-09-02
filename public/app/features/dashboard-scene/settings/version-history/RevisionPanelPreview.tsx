@@ -1,17 +1,14 @@
 import { css } from '@emotion/css';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { type GrafanaTheme2 } from '@grafana/data';
+import { type GrafanaTheme2, rangeUtil } from '@grafana/data';
 import { t } from '@grafana/i18n';
-import { type SceneTimeRangeLike } from '@grafana/scenes';
+import { sceneGraph, type SceneTimeRangeLike } from '@grafana/scenes';
 import { useStyles2 } from '@grafana/ui';
 
 import { type DashboardScene } from '../../scene/DashboardScene';
 
-import {
-  buildRevisionPanelPreviewScene,
-  type PreviewTimeRange,
-} from './buildRevisionPanelPreviewScene';
+import { buildRevisionPanelPreviewScene, type PreviewTimeRange } from './buildRevisionPanelPreviewScene';
 import { type VisualPanelSnapshot } from './getVisualDashboardDiff';
 
 type RevisionPanelPreviewProps = {
@@ -70,18 +67,22 @@ function RevisionPanelPreviewActive({
     if (!scene) {
       return;
     }
-    return scene.activate();
+    // Activate only the preview time range. Activating the DashboardScene would
+    // overwrite getDashboardSrv() current and global scene context.
+    return sceneGraph.getTimeRange(scene).activate();
   }, [scene]);
 
   useEffect(() => {
     if (!scene) {
       return;
     }
-    scene.state.$timeRange?.setState({
-      from: timeRangeValues.from,
-      to: timeRangeValues.to,
-      timeZone: timeRangeValues.timeZone,
-    });
+    const previewTimeRange = sceneGraph.getTimeRange(scene);
+    if (previewTimeRange.state.timeZone !== timeRangeValues.timeZone) {
+      previewTimeRange.onTimeZoneChange(timeRangeValues.timeZone);
+    }
+    previewTimeRange.onTimeRangeChange(
+      rangeUtil.convertRawToRange({ from: timeRangeValues.from, to: timeRangeValues.to }, timeRangeValues.timeZone)
+    );
   }, [scene, timeRangeValues.from, timeRangeValues.to, timeRangeValues.timeZone]);
 
   if (!scene) {

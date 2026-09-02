@@ -132,9 +132,19 @@ function extractV1Panels(dashboard: object): VisualPanelSnapshot[] {
   }
 
   const snapshots: VisualPanelSnapshot[] = [];
-  for (const panel of dashboard.panels) {
-    if (!isRecord(panel) || panel.type === 'row') {
-      continue;
+
+  const addPanel = (panel: unknown) => {
+    if (!isRecord(panel)) {
+      return;
+    }
+    // Collapsed rows store children only on row.panels; skip the row itself.
+    if (panel.type === 'row') {
+      if (Array.isArray(panel.panels)) {
+        for (const child of panel.panels) {
+          addPanel(child);
+        }
+      }
+      return;
     }
     const id = panel.id;
     const title = typeof panel.title === 'string' ? panel.title : '';
@@ -147,6 +157,10 @@ function extractV1Panels(dashboard: object): VisualPanelSnapshot[] {
       panel,
       layout: panel.gridPos,
     });
+  };
+
+  for (const panel of dashboard.panels) {
+    addPanel(panel);
   }
   return snapshots;
 }

@@ -87,6 +87,58 @@ describe('getVisualDashboardDiff', () => {
     expect(getVisualDashboardDiff(lhs, rhs).panels).toEqual([]);
   });
 
+  it('includes panels nested on collapsed rows', () => {
+    const child = {
+      id: 2,
+      title: 'Nested',
+      type: 'stat',
+      targets: [{ refId: 'A' }],
+      gridPos: { x: 0, y: 1, w: 12, h: 4 },
+    };
+    const lhs = {
+      title: 'Dash',
+      panels: [{ id: 10, title: 'Row', type: 'row', collapsed: true, panels: [child] }],
+    };
+    const rhs = {
+      title: 'Dash',
+      panels: [
+        {
+          id: 10,
+          title: 'Row',
+          type: 'row',
+          collapsed: true,
+          panels: [{ ...child, targets: [{ refId: 'A' }, { refId: 'B' }] }],
+        },
+      ],
+    };
+
+    const result = getVisualDashboardDiff(lhs, rhs);
+
+    expect(result.panels).toEqual([
+      expect.objectContaining({ key: '2', kind: 'changed', title: 'Nested', type: 'stat' }),
+    ]);
+  });
+
+  it('does not treat row collapse-state-only moves as added or removed panels', () => {
+    const child = {
+      id: 2,
+      title: 'Nested',
+      type: 'stat',
+      targets: [{ refId: 'A' }],
+      gridPos: { x: 0, y: 1, w: 12, h: 4 },
+    };
+    const collapsed = {
+      title: 'Dash',
+      panels: [{ id: 10, title: 'Row', type: 'row', collapsed: true, panels: [child] }],
+    };
+    const expanded = {
+      title: 'Dash',
+      panels: [{ id: 10, title: 'Row', type: 'row', collapsed: false, panels: [] }, { ...child }],
+    };
+
+    expect(getVisualDashboardDiff(collapsed, expanded).panels).toEqual([]);
+  });
+
   it('falls back to title+type when ids differ', () => {
     const lhs = {
       title: 'Dash',
@@ -114,7 +166,12 @@ describe('getVisualDashboardDiff', () => {
         description: '',
         links: [],
         data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
-        vizConfig: { kind: 'VizConfig', group: 'timeseries', version: '', spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } } },
+        vizConfig: {
+          kind: 'VizConfig',
+          group: 'timeseries',
+          version: '',
+          spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+        },
       },
     };
     const lhs = {
@@ -158,7 +215,9 @@ describe('getVisualDashboardDiff', () => {
   it('handles mixed v1↔v2 history with title fallback and migration flag', () => {
     const lhs = {
       title: 'Old format',
-      panels: [{ id: 1, title: 'CPU', type: 'timeseries', targets: [{ refId: 'A' }], gridPos: { x: 0, y: 0, w: 12, h: 8 } }],
+      panels: [
+        { id: 1, title: 'CPU', type: 'timeseries', targets: [{ refId: 'A' }], gridPos: { x: 0, y: 0, w: 12, h: 8 } },
+      ],
     };
     const rhs = {
       title: 'New format',
