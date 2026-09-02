@@ -1,7 +1,7 @@
 import { isEqual } from 'lodash';
 
-import { isDashboardV2Spec } from 'app/features/dashboard/api/utils';
 import { isRecord } from 'app/core/utils/isRecord';
+import { isDashboardV2Spec } from 'app/features/dashboard/api/utils';
 
 export type VisualPanelChangeKind = 'added' | 'removed' | 'changed' | 'layout-only';
 
