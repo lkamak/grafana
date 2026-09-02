@@ -38,13 +38,24 @@ To compare two dashboard versions, follow these steps:
 1. Go to the **Versions** tab.
 1. Select the two dashboard versions that you want to compare.
 1. Click **Compare versions** to view the diff between the two versions.
-1. Review the text descriptions of the differences between the versions.
-1. (Optional) Expand the **View JSON Diff** section of the page to see the diff of the raw JSON that represents your dashboard.
+1. Review the differences between the versions.
 1. When you've finished comparing versions, click **Back to dashboard** and **Exit edit**.
 
 When you're comparing versions, if one of the versions you've selected is the latest version, a button to restore the previous version is also displayed, so you can restore a version from the compare view:
 
 ![Dashboards versions diff](/media/docs/grafana/dashboards/screenshot-dashboard-compare-versions-restore-11.2.png)
+
+### Visual version compare
+
+When the `dashboardVisualVersionDiff` feature toggle is enabled, the compare view opens on the **Visual** tab by default. That tab shows a live, side-by-side preview of each panel that was added, removed, or changed between the two versions.
+
+{{< admonition type="note" >}}
+Visual previews query your current data sources using the open dashboard's time range. They show how each version would render now, not a historical snapshot of past query results.
+{{< /admonition >}}
+
+Use the filter chips to show or hide **Changed**, **Added**, **Removed**, and **Layout only** panels. Dashboard-level edits such as title, variables, and annotations still appear as the existing summary list under **Dashboard-level changes**.
+
+The **Changes** tab keeps the text summary of JSON field differences. The **JSON** tab shows the full raw JSON diff. When the feature toggle is off, Grafana keeps the previous summary-plus-JSON compare layout.
 
 ## Restore a previously dashboard version
 
