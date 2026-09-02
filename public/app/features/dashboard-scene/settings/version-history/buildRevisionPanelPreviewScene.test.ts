@@ -44,7 +44,7 @@ describe('buildRevisionPanelPreviewScene', () => {
           description: '',
           links: [],
           data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
-          vizConfig: { kind: 'timeseries', spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } } },
+          vizConfig: { kind: 'VizConfig', group: 'timeseries', version: '', spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } } },
         },
       },
       layout: { x: 0, y: 0, width: 12, height: 8 },

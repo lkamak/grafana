@@ -114,7 +114,7 @@ describe('getVisualDashboardDiff', () => {
         description: '',
         links: [],
         data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
-        vizConfig: { kind: 'timeseries', spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } } },
+        vizConfig: { kind: 'VizConfig', group: 'timeseries', version: '', spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } } },
       },
     };
     const lhs = {
@@ -172,7 +172,9 @@ describe('getVisualDashboardDiff', () => {
             links: [],
             data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
             vizConfig: {
-              kind: 'timeseries',
+              kind: 'VizConfig',
+              group: 'timeseries',
+              version: '',
               spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
             },
           },

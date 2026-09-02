@@ -172,9 +172,11 @@ function extractV2Panels(dashboard: object): VisualPanelSnapshot[] {
     const type =
       element.kind === 'LibraryPanel'
         ? 'library-panel'
-        : isRecord(spec.vizConfig) && typeof spec.vizConfig.kind === 'string'
-          ? spec.vizConfig.kind
-          : '';
+        : isRecord(spec.vizConfig) && typeof spec.vizConfig.group === 'string' && spec.vizConfig.group
+          ? spec.vizConfig.group
+          : isRecord(spec.vizConfig) && typeof spec.vizConfig.kind === 'string' && spec.vizConfig.kind !== 'VizConfig'
+            ? spec.vizConfig.kind
+            : '';
     snapshots.push({
       key: elementKey,
       title,
