@@ -1,8 +1,7 @@
+import { cloneDeep } from 'lodash';
+
 import { type SceneTimeRangeState } from '@grafana/scenes';
-import {
-  defaultTimeSettingsSpec,
-  type Spec as DashboardV2Spec,
-} from '@grafana/schema/apis/dashboard.grafana.app/v2';
+import { defaultTimeSettingsSpec, type Spec as DashboardV2Spec } from '@grafana/schema/apis/dashboard.grafana.app/v2';
 import { isRecord } from 'app/core/utils/isRecord';
 import { AnnoKeyEmbedded } from 'app/features/apiserver/types';
 import { isDashboardV2Spec } from 'app/features/dashboard/api/utils';
@@ -40,7 +39,8 @@ function buildV1PreviewScene(
   timeRange: PreviewTimeRange,
   sourceDashboard?: object
 ): DashboardScene {
-  const panel = isRecord(snapshot.panel) ? { ...snapshot.panel } : {};
+  // Deep-clone so PanelModel / schema migrations cannot mutate the revision snapshot.
+  const panel = cloneDeep(isRecord(snapshot.panel) ? snapshot.panel : {});
   // Force a single full-width layout cell so the preview row is consistent.
   panel.gridPos = { x: 0, y: 0, w: 24, h: 8 };
 
@@ -82,8 +82,9 @@ function buildV2PreviewScene(
   const sourceSpec: Partial<DashboardV2Spec> =
     sourceDashboard && isDashboardV2Spec(sourceDashboard) ? sourceDashboard : {};
 
+  // Deep-clone so scene transform cannot mutate the revision snapshot.
   // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-  const element = snapshot.panel as DashboardV2Spec['elements'][string];
+  const element = cloneDeep(snapshot.panel) as DashboardV2Spec['elements'][string];
 
   const spec: DashboardV2Spec = {
     title: sourceSpec.title ?? 'Version preview',
