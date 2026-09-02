@@ -131,7 +131,7 @@ describe('VersionHistoryComparison', () => {
     config.featureToggles.dashboardVisualVersionDiff = true;
     const user = userEvent.setup();
 
-    render(
+    const { rerender } = render(
       <VersionHistoryComparison
         baseInfo={newInfo}
         newInfo={removedInfo}
@@ -146,7 +146,6 @@ describe('VersionHistoryComparison', () => {
     expect(screen.getByText(/Added \(/)).toBeInTheDocument();
     expect(screen.getByText(/Removed \(/)).toBeInTheDocument();
 
-    // Show removed filter (off by default? wait - removed is in default activeFilters)
     // Default filters include removed, so the removed panel row should be visible.
     expect(screen.getByTestId('visual-diff-missing-rhs')).toBeInTheDocument();
     expect(screen.getByText(/Panel removed in newer version/)).toBeInTheDocument();
@@ -154,6 +153,21 @@ describe('VersionHistoryComparison', () => {
     // Toggle off removed filter
     await user.click(screen.getByRole('button', { name: /Removed/ }));
     expect(screen.queryByTestId('visual-diff-missing-rhs')).not.toBeInTheDocument();
+
+    // Added panel: older version missing left side
+    rerender(
+      <VersionHistoryComparison
+        baseInfo={baseInfo}
+        newInfo={newInfo}
+        diffData={{ lhs: baseInfo.data, rhs: newInfo.data }}
+        isNewLatest={true}
+        onRestore={onRestore}
+        sharedTimeRange={sharedTimeRange}
+      />
+    );
+
+    expect(screen.getByTestId('visual-diff-missing-lhs')).toBeInTheDocument();
+    expect(screen.getByText(/Panel added in newer version/)).toBeInTheDocument();
   });
 
   it('shows an empty state when only dashboard-level fields changed', () => {
