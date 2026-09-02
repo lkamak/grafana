@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 
 import { PageLayoutType, dateTimeFormat, dateTimeFormatTimeAgo } from '@grafana/data';
 import { Trans } from '@grafana/i18n';
+import { config } from '@grafana/runtime';
 import { type SceneComponentProps, SceneObjectBase, sceneGraph } from '@grafana/scenes';
 import { Alert, Spinner, Stack } from '@grafana/ui';
 import { useGetDisplayMappingQuery } from 'app/api/clients/iam/v0alpha1';
@@ -246,6 +247,9 @@ function VersionsEditorSettingsListView({ model }: SceneComponentProps<VersionsE
     model.versions.length % model.limit !== 0 ||
     model.continueToken === '';
 
+  const visualDiffEnabled = Boolean(config.featureToggles.dashboardVisualVersionDiff);
+  const sharedTimeRange = model.getTimeRange();
+
   const viewModeCompare = (
     <>
       <VersionHistoryHeader
@@ -263,6 +267,7 @@ function VersionsEditorSettingsListView({ model }: SceneComponentProps<VersionsE
           isNewLatest={isNewLatest!}
           diffData={model.diffData}
           onRestore={dashboard.onRestore}
+          sharedTimeRange={visualDiffEnabled ? sharedTimeRange : undefined}
         />
       )}
     </>
@@ -296,8 +301,11 @@ function VersionsEditorSettingsListView({ model }: SceneComponentProps<VersionsE
 
   const isProvisioned = dashboard.isManagedRepository();
 
+  const pageLayout =
+    viewMode === 'compare' && visualDiffEnabled ? PageLayoutType.Canvas : PageLayoutType.Standard;
+
   return (
-    <Page navModel={navModel} pageNav={pageNav} layout={PageLayoutType.Standard}>
+    <Page navModel={navModel} pageNav={pageNav} layout={pageLayout}>
       <NavToolbarActions dashboard={dashboard} />
       {isProvisioned ? (
         <Alert title="" severity="info">

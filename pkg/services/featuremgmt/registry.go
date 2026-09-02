@@ -678,6 +678,14 @@ var (
 			Expression:  "false",
 		},
 		{
+			Name:        "dashboardVisualVersionDiff",
+			Description: "Enables visual side-by-side panel comparison when reviewing dashboard version history",
+			Stage:       FeatureStageExperimental,
+			Generate:    Generate{LegacyFrontend: true},
+			Owner:       grafanaDashboardsSquad,
+			Expression:  "false",
+		},
+		{
 			Name:        "perPanelNonApplicableDrilldowns",
 			Description: "Enables viewing non-applicable drilldowns on a panel level",
 			Stage:       FeatureStageExperimental,
