@@ -324,6 +324,11 @@ export interface FeatureToggles {
   */
   dashboardUndoRedo?: boolean;
   /**
+  * Enables visual side-by-side panel comparison when reviewing dashboard version history
+  * @default false
+  */
+  dashboardVisualVersionDiff?: boolean;
+  /**
   * Enables viewing non-applicable drilldowns on a panel level
   * @default false
   */

@@ -1684,6 +1684,20 @@
     },
     {
       "metadata": {
+        "name": "dashboardVisualVersionDiff",
+        "resourceVersion": "1788372122376",
+        "creationTimestamp": "2026-09-02T18:02:02Z"
+      },
+      "spec": {
+        "description": "Enables visual side-by-side panel comparison when reviewing dashboard version history",
+        "stage": "experimental",
+        "codeowner": "@grafana/dashboards-squad",
+        "frontend": true,
+        "expression": "false"
+      }
+    },
+    {
+      "metadata": {
         "name": "dashgpt",
         "resourceVersion": "1779440584464",
         "creationTimestamp": "2023-08-30T20:22:05Z",
