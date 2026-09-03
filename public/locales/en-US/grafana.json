@@ -7282,6 +7282,28 @@
       "threshold-badge-tooltip": "This preset will modify thresholds",
       "title": "Panel styles"
     },
+    "panel-version-diff": {
+      "added-detail": "This panel was added.",
+      "base-version": "Version {{version}}",
+      "description": "Each panel is marked added, removed, changed, moved, or unchanged. Click a changed panel to see title, query, visualization, and threshold diffs.",
+      "empty": "No panels to compare in these versions.",
+      "empty-canvas": "No panels in this version.",
+      "field-layout": "Layout",
+      "field-query": "Query",
+      "field-thresholds": "Thresholds",
+      "field-title": "Title",
+      "field-viz-type": "Visualization",
+      "heading": "Panel layout",
+      "kind-added": "added",
+      "kind-changed": "changed",
+      "kind-moved": "moved",
+      "kind-removed": "removed",
+      "kind-unchanged": "unchanged",
+      "moved-detail": "This panel was moved.",
+      "new-version": "Version {{version}}",
+      "removed-detail": "This panel was removed.",
+      "unchanged-detail": "No title, query, visualization, threshold, or layout changes."
+    },
     "panel-viz-type-picker": {
       "button": {
         "close": "Back"
