@@ -514,6 +514,66 @@ describe('panelVersionDiff', () => {
       },
     ]);
   });
+
+  it('walks nested groups under the merged default tab, not each version first tab', () => {
+    const lhs = {
+      elements: {
+        innerA: v2Panel('Inner A panel'),
+        innerB: v2Panel('Inner B panel'),
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            parentTabWithNested('overview', 'Overview', [
+              { id: 'inner-a', title: 'Inner A', element: 'innerA' },
+              { id: 'inner-b', title: 'Inner B', element: 'innerB' },
+            ]),
+          ],
+        },
+      },
+    };
+    const rhs = {
+      elements: {
+        extra1: v2Panel('Extra 1 panel'),
+        extra2: v2Panel('Extra 2 panel'),
+        innerA: v2Panel('Inner A panel'),
+        innerB: v2Panel('Inner B panel'),
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            parentTabWithNested('new-tab', 'New', [
+              { id: 'extra-1', title: 'Extra 1', element: 'extra1' },
+              { id: 'extra-2', title: 'Extra 2', element: 'extra2' },
+            ]),
+            parentTabWithNested('overview', 'Overview', [
+              { id: 'inner-a', title: 'Inner A', element: 'innerA' },
+              { id: 'inner-b', title: 'Inner B', element: 'innerB' },
+            ]),
+          ],
+        },
+      },
+    };
+
+    expect(mergeDashboardTabGroups(lhs, rhs)).toEqual([
+      {
+        id: 'root',
+        tabs: [
+          { id: 'overview', title: 'Overview' },
+          { id: 'new-tab', title: 'New' },
+        ],
+      },
+      {
+        id: 'root/overview',
+        tabs: [
+          { id: 'inner-a', title: 'Inner A' },
+          { id: 'inner-b', title: 'Inner B' },
+        ],
+      },
+    ]);
+  });
 });
 
 function v2Panel(title: string) {
@@ -605,6 +665,24 @@ function nestedTabsDashboard() {
             },
           },
         ],
+      },
+    },
+  };
+}
+
+function parentTabWithNested(id: string, title: string, inner: Array<{ id: string; title: string; element: string }>) {
+  return {
+    metadata: { name: id },
+    spec: {
+      title,
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: inner.map((tab) => ({
+            metadata: { name: tab.id },
+            spec: { title: tab.title, layout: v2Grid(tab.element) },
+          })),
+        },
       },
     },
   };

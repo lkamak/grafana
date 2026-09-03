@@ -110,9 +110,36 @@ export function mergeDashboardTabGroups(
   rhs: unknown,
   selection?: TabSelection
 ): DashboardTabGroup[] | undefined {
-  const lhsGroups = listDashboardTabGroups(lhs, selection) ?? [];
-  const rhsGroups = listDashboardTabGroups(rhs, selection) ?? [];
+  let current: TabSelection = { ...selection };
+  let merged = mergeTabGroupLists(
+    listDashboardTabGroups(lhs, current) ?? [],
+    listDashboardTabGroups(rhs, current) ?? []
+  );
 
+  // Missing group keys walk each version's first tab. Re-collect after
+  // applying the same merged defaults the canvases use so nested pickers
+  // belong to the tab that is actually on screen.
+  while (merged) {
+    let filled = false;
+    for (const group of merged) {
+      if (current[group.id] === undefined && group.tabs[0]) {
+        current[group.id] = group.tabs[0].id;
+        filled = true;
+      }
+    }
+    if (!filled) {
+      break;
+    }
+    merged = mergeTabGroupLists(listDashboardTabGroups(lhs, current) ?? [], listDashboardTabGroups(rhs, current) ?? []);
+  }
+
+  return merged;
+}
+
+function mergeTabGroupLists(
+  lhsGroups: DashboardTabGroup[],
+  rhsGroups: DashboardTabGroup[]
+): DashboardTabGroup[] | undefined {
   if (lhsGroups.length === 0 && rhsGroups.length === 0) {
     return undefined;
   }

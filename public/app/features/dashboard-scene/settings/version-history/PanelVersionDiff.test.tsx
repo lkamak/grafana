@@ -489,6 +489,92 @@ describe('PanelVersionDiff', () => {
     expect(screen.queryByText('Inner A panel')).not.toBeInTheDocument();
     expect(screen.getAllByText('Inner B panel')).toHaveLength(2);
   });
+
+  it('shows nested pickers for the merged default tab when first tabs differ', () => {
+    const innerTabs = (prefix: string, titles: [string, string]) => ({
+      kind: 'TabsLayout' as const,
+      spec: {
+        tabs: titles.map((title, index) => {
+          const id = `${prefix}-${index === 0 ? 'a' : 'b'}`;
+          return {
+            metadata: { name: id },
+            spec: {
+              title,
+              layout: {
+                kind: 'GridLayout',
+                spec: {
+                  items: [{ spec: { element: { name: id }, x: 0, y: 0, width: 12, height: 8 } }],
+                },
+              },
+            },
+          };
+        }),
+      },
+    });
+
+    renderDiff({
+      lhs: {
+        elements: {
+          'inner-a': {
+            spec: { title: 'Inner A panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } },
+          },
+          'inner-b': {
+            spec: { title: 'Inner B panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } },
+          },
+        },
+        layout: {
+          kind: 'TabsLayout',
+          spec: {
+            tabs: [
+              {
+                metadata: { name: 'overview' },
+                spec: { title: 'Overview', layout: innerTabs('inner', ['Inner A', 'Inner B']) },
+              },
+            ],
+          },
+        },
+      },
+      rhs: {
+        elements: {
+          'extra-a': {
+            spec: { title: 'Extra A panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } },
+          },
+          'extra-b': {
+            spec: { title: 'Extra B panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } },
+          },
+          'inner-a': {
+            spec: { title: 'Inner A panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } },
+          },
+          'inner-b': {
+            spec: { title: 'Inner B panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } },
+          },
+        },
+        layout: {
+          kind: 'TabsLayout',
+          spec: {
+            tabs: [
+              {
+                metadata: { name: 'new-tab' },
+                spec: { title: 'New', layout: innerTabs('extra', ['Extra A', 'Extra B']) },
+              },
+              {
+                metadata: { name: 'overview' },
+                spec: { title: 'Overview', layout: innerTabs('inner', ['Inner A', 'Inner B']) },
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    expect(screen.getByRole('radio', { name: 'Overview' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Inner A' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Inner B' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Extra A' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Extra B' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Inner A panel')).toHaveLength(2);
+    expect(screen.queryByText('Extra A panel')).not.toBeInTheDocument();
+  });
 });
 
 function tabbedDashboard(tabs: Array<{ id: string; title: string; panelTitle: string }>) {
