@@ -37,10 +37,20 @@ export function PanelVersionDiff({ lhs, rhs, baseVersion, newVersion }: PanelVer
   const styles = useStyles2(getStyles);
   const [selectedByGroup, setSelectedByGroup] = useState<TabSelection>({});
   const tabGroups = useMemo(() => mergeDashboardTabGroups(lhs, rhs, selectedByGroup), [lhs, rhs, selectedByGroup]);
-  const items = useMemo(
-    () => diffDashboardPanels(lhs, rhs, tabGroups ? selectedByGroup : undefined),
-    [lhs, rhs, tabGroups, selectedByGroup]
-  );
+  const items = useMemo(() => {
+    if (!tabGroups) {
+      return diffDashboardPanels(lhs, rhs);
+    }
+
+    const selection: TabSelection = { ...selectedByGroup };
+    for (const group of tabGroups) {
+      if (selection[group.id] === undefined && group.tabs[0]) {
+        selection[group.id] = group.tabs[0].id;
+      }
+    }
+
+    return diffDashboardPanels(lhs, rhs, selection);
+  }, [lhs, rhs, tabGroups, selectedByGroup]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = items.find((item) => item.id === selectedId);
 

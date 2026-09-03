@@ -448,11 +448,13 @@ function collectTabGroupsFromLayout(
     const tabs = spec.tabs.map((tab, index) => tabToDashboardTab(tab, index));
     groups.push({ id: groupId, tabs });
 
-    const selectedId = selection?.[groupId] ?? tabs[0]?.id;
-    const selectedIndex = Math.max(
-      0,
-      tabs.findIndex((tab) => tab.id === selectedId)
-    );
+    const selectedId = selection?.[groupId];
+    const selectedIndex = selectedId ? tabs.findIndex((tab) => tab.id === selectedId) : tabs.length > 0 ? 0 : -1;
+    // A selected tab that is absent from this version must not walk the
+    // first tab; that would surface nested groups from a different view.
+    if (selectedIndex < 0) {
+      return;
+    }
     const selectedTab = spec.tabs[selectedIndex];
     if (isRecord(selectedTab)) {
       const tabSpec = isRecord(selectedTab.spec) ? selectedTab.spec : selectedTab;
@@ -498,10 +500,18 @@ function chooseTabFromGroup(
         return { tab, index };
       }
     }
+
+    // Map selections are per-group. If this version lacks the selected tab,
+    // leave the canvas empty instead of comparing an unrelated first tab.
+    // A string selection is a global tab id, so unmatched sibling groups
+    // still fall through to their default tab.
+    if (typeof tabSelection !== 'string') {
+      return undefined;
+    }
   }
 
-  // Sibling and nested tab groups are independent. If this group does not
-  // contain the selected tab, keep its default (first) tab so those panels
+  // Sibling and nested tab groups are independent. A group with no
+  // selection of its own keeps its default (first) tab so those panels
   // still appear in the stacked layout.
   for (let index = 0; index < tabs.length; index++) {
     const tab = tabs[index];

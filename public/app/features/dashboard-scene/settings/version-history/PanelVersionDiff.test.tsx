@@ -386,6 +386,47 @@ describe('PanelVersionDiff', () => {
     expect(screen.getAllByText('System panel')).toHaveLength(2);
   });
 
+  it('compares the merged default tab on both canvases when first tabs differ', () => {
+    renderDiff({
+      lhs: tabbedDashboard([
+        { id: 'overview', title: 'Overview', panelTitle: 'Overview panel' },
+        { id: 'details', title: 'Details', panelTitle: 'Details panel' },
+      ]),
+      rhs: tabbedDashboard([
+        { id: 'new-tab', title: 'New', panelTitle: 'New panel' },
+        { id: 'overview', title: 'Overview', panelTitle: 'Overview panel' },
+        { id: 'details', title: 'Details', panelTitle: 'Details panel' },
+      ]),
+    });
+
+    expect(screen.getByRole('radio', { name: 'Overview' })).toBeChecked();
+    expect(screen.getAllByText('Overview panel')).toHaveLength(2);
+    expect(screen.queryByText('New panel')).not.toBeInTheDocument();
+  });
+
+  it('leaves a canvas empty when the selected tab is missing from that version', () => {
+    renderDiff({
+      lhs: tabbedDashboard([{ id: 'overview', title: 'Overview', panelTitle: 'Overview panel' }]),
+      rhs: tabbedDashboard([
+        { id: 'new-tab', title: 'New', panelTitle: 'New panel' },
+        { id: 'overview', title: 'Overview', panelTitle: 'Overview panel' },
+      ]),
+    });
+
+    fireEvent.click(screen.getByRole('radio', { name: 'New' }));
+
+    expect(screen.queryByText('Overview panel')).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId(selectors.pages.Dashboard.Settings.Versions.panelTile('untitled:New panel:stat', 'base'))
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('New panel')).toBeInTheDocument();
+    expect(
+      within(screen.getByTestId(selectors.pages.Dashboard.Settings.Versions.baseCanvas)).getByText(
+        'No panels in this version.'
+      )
+    ).toBeInTheDocument();
+  });
+
   it('shows nested tab panels when the parent tab is selected', () => {
     const dashboard = {
       elements: {
@@ -449,3 +490,36 @@ describe('PanelVersionDiff', () => {
     expect(screen.getAllByText('Inner B panel')).toHaveLength(2);
   });
 });
+
+function tabbedDashboard(tabs: Array<{ id: string; title: string; panelTitle: string }>) {
+  const elements: Record<
+    string,
+    { spec: { title: string; vizConfig: { group: string }; data: { spec: { queries: never[] } } } }
+  > = {};
+  for (const tab of tabs) {
+    elements[tab.id] = {
+      spec: { title: tab.panelTitle, vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } },
+    };
+  }
+
+  return {
+    elements,
+    layout: {
+      kind: 'TabsLayout',
+      spec: {
+        tabs: tabs.map((tab) => ({
+          metadata: { name: tab.id },
+          spec: {
+            title: tab.title,
+            layout: {
+              kind: 'GridLayout',
+              spec: {
+                items: [{ spec: { element: { name: tab.id }, x: 0, y: 0, width: 12, height: 8 } }],
+              },
+            },
+          },
+        })),
+      },
+    },
+  };
+}

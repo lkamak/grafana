@@ -426,6 +426,43 @@ describe('panelVersionDiff', () => {
     expect(extractPanels(dashboard, { root: 'parent', 'root/parent': 'inner-b' })[0].title).toBe('Inner B panel');
   });
 
+  it('does not substitute another tab when the selected tab is missing from a version', () => {
+    const lhs = {
+      elements: {
+        overview: v2Panel('Overview panel'),
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [{ metadata: { name: 'overview' }, spec: { title: 'Overview', layout: v2Grid('overview') } }],
+        },
+      },
+    };
+    const rhs = {
+      elements: {
+        overview: v2Panel('Overview panel'),
+        added: v2Panel('New panel'),
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            { metadata: { name: 'new-tab' }, spec: { title: 'New', layout: v2Grid('added') } },
+            { metadata: { name: 'overview' }, spec: { title: 'Overview', layout: v2Grid('overview') } },
+          ],
+        },
+      },
+    };
+
+    expect(extractPanels(lhs, { root: 'new-tab' })).toEqual([]);
+    expect(extractPanels(rhs, { root: 'new-tab' }).map((panel) => panel.title)).toEqual(['New panel']);
+
+    const diff = diffDashboardPanels(lhs, rhs, { root: 'new-tab' });
+    expect(diff).toHaveLength(1);
+    expect(diff[0].kind).toBe('added');
+    expect(diff[0].next?.title).toBe('New panel');
+  });
+
   it('merges sibling tab groups from both versions', () => {
     const lhs = siblingTabGroupsDashboard();
     const rhs = {
