@@ -11,8 +11,9 @@ import {
   type PanelChangeKind,
   type PanelGridPos,
   type PanelVersionDiffItem,
+  type TabSelection,
   diffDashboardPanels,
-  mergeDashboardTabs,
+  mergeDashboardTabGroups,
 } from './panelVersionDiff';
 
 type PanelVersionDiffProps = {
@@ -34,18 +35,16 @@ const KIND_BADGE_COLOR: Record<PanelChangeKind, 'green' | 'red' | 'orange' | 'bl
 
 export function PanelVersionDiff({ lhs, rhs, baseVersion, newVersion }: PanelVersionDiffProps) {
   const styles = useStyles2(getStyles);
-  const tabs = useMemo(() => mergeDashboardTabs(lhs, rhs), [lhs, rhs]);
-  const [selectedTabId, setSelectedTabId] = useState<string | undefined>(() => tabs?.[0]?.id);
+  const [selectedByGroup, setSelectedByGroup] = useState<TabSelection>({});
+  const tabGroups = useMemo(() => mergeDashboardTabGroups(lhs, rhs, selectedByGroup), [lhs, rhs, selectedByGroup]);
   const items = useMemo(
-    () => diffDashboardPanels(lhs, rhs, tabs ? selectedTabId : undefined),
-    [lhs, rhs, tabs, selectedTabId]
+    () => diffDashboardPanels(lhs, rhs, tabGroups ? selectedByGroup : undefined),
+    [lhs, rhs, tabGroups, selectedByGroup]
   );
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = items.find((item) => item.id === selectedId);
 
-  const tabOptions = useMemo(() => (tabs ?? []).map((tab) => ({ label: tab.title, value: tab.id })), [tabs]);
-
-  if (items.length === 0 && !tabs) {
+  if (items.length === 0 && !tabGroups) {
     return (
       <Text color="secondary">
         <Trans i18nKey="dashboard-scene.panel-version-diff.empty" defaults="No panels to compare in these versions." />
@@ -67,16 +66,20 @@ export function PanelVersionDiff({ lhs, rhs, baseVersion, newVersion }: PanelVer
         </Text>
       </Box>
 
-      {tabs && tabs.length > 0 && (
-        <RadioButtonGroup
-          options={tabOptions}
-          value={selectedTabId}
-          onChange={(value) => {
-            setSelectedTabId(value);
-            setSelectedId(null);
-          }}
-          data-testid={selectors.pages.Dashboard.Settings.Versions.tabPicker}
-        />
+      {tabGroups && tabGroups.length > 0 && (
+        <Stack direction="column" gap={1} data-testid={selectors.pages.Dashboard.Settings.Versions.tabPicker}>
+          {tabGroups.map((group) => (
+            <RadioButtonGroup
+              key={group.id}
+              options={group.tabs.map((tab) => ({ label: tab.title, value: tab.id }))}
+              value={selectedByGroup[group.id] ?? group.tabs[0]?.id}
+              onChange={(value) => {
+                setSelectedByGroup((current) => ({ ...current, [group.id]: value }));
+                setSelectedId(null);
+              }}
+            />
+          ))}
+        </Stack>
       )}
 
       <Stack gap={1}>

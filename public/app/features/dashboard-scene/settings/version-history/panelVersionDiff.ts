@@ -42,6 +42,13 @@ export type DashboardTab = {
   title: string;
 };
 
+export type DashboardTabGroup = {
+  id: string;
+  tabs: DashboardTab[];
+};
+
+export type TabSelection = Record<string, string>;
+
 const DEFAULT_GRID_POS: PanelGridPos = { x: 0, y: 0, w: GRID_COLUMN_COUNT, h: 8 };
 
 export function listDashboardTabs(dashboard: unknown): DashboardTab[] | undefined {
@@ -87,7 +94,52 @@ export function mergeDashboardTabs(lhs: unknown, rhs: unknown): DashboardTab[] |
   return Array.from(merged.values());
 }
 
-export function extractPanels(dashboard: unknown, tabId?: string): PanelSnapshot[] {
+export function listDashboardTabGroups(dashboard: unknown, selection?: TabSelection): DashboardTabGroup[] | undefined {
+  const spec = unwrapDashboard(dashboard);
+  if (!spec) {
+    return undefined;
+  }
+
+  const groups: DashboardTabGroup[] = [];
+  collectTabGroupsFromLayout(spec.layout, '', selection, groups);
+  return groups.length > 0 ? groups : undefined;
+}
+
+export function mergeDashboardTabGroups(
+  lhs: unknown,
+  rhs: unknown,
+  selection?: TabSelection
+): DashboardTabGroup[] | undefined {
+  const lhsGroups = listDashboardTabGroups(lhs, selection) ?? [];
+  const rhsGroups = listDashboardTabGroups(rhs, selection) ?? [];
+
+  if (lhsGroups.length === 0 && rhsGroups.length === 0) {
+    return undefined;
+  }
+
+  const merged: DashboardTabGroup[] = [];
+  const indexById = new Map<string, number>();
+
+  for (const group of [...lhsGroups, ...rhsGroups]) {
+    const existingIndex = indexById.get(group.id);
+    if (existingIndex === undefined) {
+      indexById.set(group.id, merged.length);
+      merged.push({ id: group.id, tabs: [...group.tabs] });
+      continue;
+    }
+
+    const existing = merged[existingIndex];
+    for (const tab of group.tabs) {
+      if (!existing.tabs.some((item) => item.id === tab.id)) {
+        existing.tabs.push(tab);
+      }
+    }
+  }
+
+  return merged;
+}
+
+export function extractPanels(dashboard: unknown, tabSelection?: string | TabSelection): PanelSnapshot[] {
   const spec = unwrapDashboard(dashboard);
   if (!spec) {
     return [];
@@ -98,15 +150,19 @@ export function extractPanels(dashboard: unknown, tabId?: string): PanelSnapshot
   }
 
   if (isRecord(spec.elements) || isRecord(spec.layout)) {
-    return collectV2Panels(spec, tabId);
+    return collectV2Panels(spec, tabSelection);
   }
 
   return [];
 }
 
-export function diffDashboardPanels(lhs: unknown, rhs: unknown, tabId?: string): PanelVersionDiffItem[] {
-  const basePanels = new Map(extractPanels(lhs, tabId).map((panel) => [panel.id, panel]));
-  const nextPanels = new Map(extractPanels(rhs, tabId).map((panel) => [panel.id, panel]));
+export function diffDashboardPanels(
+  lhs: unknown,
+  rhs: unknown,
+  tabSelection?: string | TabSelection
+): PanelVersionDiffItem[] {
+  const basePanels = new Map(extractPanels(lhs, tabSelection).map((panel) => [panel.id, panel]));
+  const nextPanels = new Map(extractPanels(rhs, tabSelection).map((panel) => [panel.id, panel]));
   const ids = new Set([...basePanels.keys(), ...nextPanels.keys()]);
   const items: PanelVersionDiffItem[] = [];
 
@@ -236,10 +292,10 @@ function snapshotFromV1Panel(panel: Record<string, unknown>): PanelSnapshot {
   };
 }
 
-function collectV2Panels(spec: Record<string, unknown>, tabId?: string): PanelSnapshot[] {
+function collectV2Panels(spec: Record<string, unknown>, tabSelection?: string | TabSelection): PanelSnapshot[] {
   const elements = isRecord(spec.elements) ? spec.elements : {};
   const snapshots: PanelSnapshot[] = [];
-  walkV2Layout(spec.layout, elements, 0, snapshots, tabId);
+  walkV2Layout(spec.layout, elements, 0, snapshots, tabSelection);
   return snapshots;
 }
 
@@ -248,7 +304,8 @@ function walkV2Layout(
   elements: Record<string, unknown>,
   yOffset: number,
   snapshots: PanelSnapshot[],
-  tabId?: string
+  tabSelection?: string | TabSelection,
+  path = ''
 ): number {
   if (!isRecord(layout)) {
     return yOffset;
@@ -273,7 +330,7 @@ function walkV2Layout(
         h: 4,
       };
       if (isRecord(panel)) {
-        snapshots.push(snapshotFromV2Panel(panel, gridPos, tabId));
+        snapshots.push(snapshotFromV2Panel(panel, gridPos, snapshotTabId(tabSelection)));
       }
     });
     return yOffset + items.length * 4;
@@ -296,7 +353,7 @@ function walkV2Layout(
         h: readNumber(itemSpec.height, 8),
       };
       if (isRecord(panel)) {
-        snapshots.push(snapshotFromV2Panel(panel, gridPos, tabId));
+        snapshots.push(snapshotFromV2Panel(panel, gridPos, snapshotTabId(tabSelection)));
       }
       maxBottom = Math.max(maxBottom, gridPos.y + gridPos.h);
     }
@@ -305,35 +362,39 @@ function walkV2Layout(
 
   if (kind === 'RowsLayout' && Array.isArray(spec.rows)) {
     let nextOffset = yOffset;
-    for (const row of spec.rows) {
+    for (let index = 0; index < spec.rows.length; index++) {
+      const row = spec.rows[index];
       if (!isRecord(row)) {
         continue;
       }
       const rowSpec = isRecord(row.spec) ? row.spec : row;
-      nextOffset = walkV2Layout(rowSpec.layout, elements, nextOffset, snapshots, tabId);
+      nextOffset = walkV2Layout(
+        rowSpec.layout,
+        elements,
+        nextOffset,
+        snapshots,
+        tabSelection,
+        rowChildPath(path, index)
+      );
     }
     return nextOffset;
   }
 
   if (kind === 'TabsLayout' && Array.isArray(spec.tabs)) {
-    const tabs = spec.tabs;
-
-    if (tabId) {
-      for (let index = 0; index < tabs.length; index++) {
-        const tab = tabs[index];
-        if (!isRecord(tab)) {
-          continue;
-        }
-        if (tabToId(tab, index) !== tabId) {
-          continue;
-        }
-        const tabSpec = isRecord(tab.spec) ? tab.spec : tab;
-        return walkV2Layout(tabSpec.layout, elements, yOffset, snapshots, tabId);
-      }
+    const groupId = path || 'root';
+    const chosen = chooseTabFromGroup(spec.tabs, groupId, tabSelection);
+    if (!chosen) {
       return yOffset;
     }
-
-    return yOffset;
+    const tabSpec = isRecord(chosen.tab.spec) ? chosen.tab.spec : chosen.tab;
+    return walkV2Layout(
+      tabSpec.layout,
+      elements,
+      yOffset,
+      snapshots,
+      tabSelection,
+      `${groupId}/${tabToId(chosen.tab, chosen.index)}`
+    );
   }
 
   return yOffset;
@@ -368,6 +429,96 @@ function collectTabsFromLayout(layout: unknown): unknown[] {
   }
 
   return [];
+}
+
+function collectTabGroupsFromLayout(
+  layout: unknown,
+  path: string,
+  selection: TabSelection | undefined,
+  groups: DashboardTabGroup[]
+): void {
+  if (!isRecord(layout)) {
+    return;
+  }
+
+  const spec = isRecord(layout.spec) ? layout.spec : layout;
+
+  if (layout.kind === 'TabsLayout' && Array.isArray(spec.tabs)) {
+    const groupId = path || 'root';
+    const tabs = spec.tabs.map((tab, index) => tabToDashboardTab(tab, index));
+    groups.push({ id: groupId, tabs });
+
+    const selectedId = selection?.[groupId] ?? tabs[0]?.id;
+    const selectedIndex = Math.max(
+      0,
+      tabs.findIndex((tab) => tab.id === selectedId)
+    );
+    const selectedTab = spec.tabs[selectedIndex];
+    if (isRecord(selectedTab)) {
+      const tabSpec = isRecord(selectedTab.spec) ? selectedTab.spec : selectedTab;
+      const selectedTabId = tabs[selectedIndex]?.id ?? tabToId(selectedTab, selectedIndex);
+      collectTabGroupsFromLayout(tabSpec.layout, `${groupId}/${selectedTabId}`, selection, groups);
+    }
+    return;
+  }
+
+  if (layout.kind === 'RowsLayout' && Array.isArray(spec.rows)) {
+    for (let index = 0; index < spec.rows.length; index++) {
+      const row = spec.rows[index];
+      if (!isRecord(row)) {
+        continue;
+      }
+      const rowSpec = isRecord(row.spec) ? row.spec : row;
+      collectTabGroupsFromLayout(rowSpec.layout, rowChildPath(path, index), selection, groups);
+    }
+  }
+}
+
+function tabToDashboardTab(tab: unknown, index: number): DashboardTab {
+  const tabSpec = isRecord(tab) && isRecord(tab.spec) ? tab.spec : isRecord(tab) ? tab : {};
+  const title = typeof tabSpec.title === 'string' && tabSpec.title ? tabSpec.title : `Tab ${index + 1}`;
+  return { id: tabToId(tab, index), title };
+}
+
+function chooseTabFromGroup(
+  tabs: unknown[],
+  groupId: string,
+  tabSelection?: string | TabSelection
+): { tab: Record<string, unknown>; index: number } | undefined {
+  if (tabSelection === undefined) {
+    return undefined;
+  }
+
+  const selectedId = typeof tabSelection === 'string' ? tabSelection : tabSelection[groupId];
+
+  if (selectedId) {
+    for (let index = 0; index < tabs.length; index++) {
+      const tab = tabs[index];
+      if (isRecord(tab) && tabToId(tab, index) === selectedId) {
+        return { tab, index };
+      }
+    }
+  }
+
+  // Sibling and nested tab groups are independent. If this group does not
+  // contain the selected tab, keep its default (first) tab so those panels
+  // still appear in the stacked layout.
+  for (let index = 0; index < tabs.length; index++) {
+    const tab = tabs[index];
+    if (isRecord(tab)) {
+      return { tab, index };
+    }
+  }
+
+  return undefined;
+}
+
+function snapshotTabId(tabSelection?: string | TabSelection): string | undefined {
+  return typeof tabSelection === 'string' ? tabSelection : undefined;
+}
+
+function rowChildPath(path: string, rowIndex: number): string {
+  return path ? `${path}/rows/${rowIndex}` : `rows/${rowIndex}`;
 }
 
 function tabToId(tab: unknown, index: number): string {

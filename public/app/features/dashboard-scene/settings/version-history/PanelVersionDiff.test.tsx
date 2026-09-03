@@ -283,4 +283,169 @@ describe('PanelVersionDiff', () => {
     expect(screen.getAllByText('Overview panel')).toHaveLength(2);
     expect(screen.queryByText('Details panel')).not.toBeInTheDocument();
   });
+
+  it('keeps sibling tab groups independently selectable', () => {
+    const dashboard = {
+      elements: {
+        cpu: { spec: { title: 'CPU panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } } },
+        memory: { spec: { title: 'Memory panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } } },
+        app: { spec: { title: 'App panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } } },
+        system: { spec: { title: 'System panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } } },
+      },
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            {
+              spec: {
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        metadata: { name: 'cpu' },
+                        spec: {
+                          title: 'CPU',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'cpu' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                      {
+                        metadata: { name: 'memory' },
+                        spec: {
+                          title: 'Memory',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'memory' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              spec: {
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        metadata: { name: 'app' },
+                        spec: {
+                          title: 'App',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'app' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                      {
+                        metadata: { name: 'system' },
+                        spec: {
+                          title: 'System',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'system' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    renderDiff({ lhs: dashboard, rhs: dashboard });
+
+    expect(screen.getAllByRole('radiogroup')).toHaveLength(2);
+    expect(screen.getAllByText('CPU panel')).toHaveLength(2);
+    expect(screen.getAllByText('App panel')).toHaveLength(2);
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Memory' }));
+    fireEvent.click(screen.getByRole('radio', { name: 'System' }));
+
+    expect(screen.queryByText('CPU panel')).not.toBeInTheDocument();
+    expect(screen.queryByText('App panel')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Memory panel')).toHaveLength(2);
+    expect(screen.getAllByText('System panel')).toHaveLength(2);
+  });
+
+  it('shows nested tab panels when the parent tab is selected', () => {
+    const dashboard = {
+      elements: {
+        innerA: { spec: { title: 'Inner A panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } } },
+        innerB: { spec: { title: 'Inner B panel', vizConfig: { group: 'stat' }, data: { spec: { queries: [] } } } },
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            {
+              metadata: { name: 'parent' },
+              spec: {
+                title: 'Parent',
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        metadata: { name: 'inner-a' },
+                        spec: {
+                          title: 'Inner A',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'innerA' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                      {
+                        metadata: { name: 'inner-b' },
+                        spec: {
+                          title: 'Inner B',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [{ spec: { element: { name: 'innerB' }, x: 0, y: 0, width: 12, height: 8 } }],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    renderDiff({ lhs: dashboard, rhs: dashboard });
+
+    expect(screen.getAllByText('Inner A panel')).toHaveLength(2);
+    expect(screen.queryByText('Inner B panel')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Inner B' }));
+
+    expect(screen.queryByText('Inner A panel')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Inner B panel')).toHaveLength(2);
+  });
 });

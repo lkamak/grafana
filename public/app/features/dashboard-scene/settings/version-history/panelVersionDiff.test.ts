@@ -2,7 +2,9 @@ import {
   diffDashboardPanels,
   extractPanels,
   formatGridPos,
+  listDashboardTabGroups,
   listDashboardTabs,
+  mergeDashboardTabGroups,
   mergeDashboardTabs,
 } from './panelVersionDiff';
 
@@ -376,4 +378,197 @@ describe('panelVersionDiff', () => {
   it('formats grid positions for display', () => {
     expect(formatGridPos({ x: 0, y: 4, w: 12, h: 8 })).toBe('(0, 4) 12×8');
   });
+
+  it('keeps sibling tab groups independent when one tab is selected', () => {
+    const dashboard = siblingTabGroupsDashboard();
+
+    expect(listDashboardTabGroups(dashboard)).toEqual([
+      {
+        id: 'rows/0',
+        tabs: [
+          { id: 'cpu', title: 'CPU' },
+          { id: 'memory', title: 'Memory' },
+        ],
+      },
+      {
+        id: 'rows/1',
+        tabs: [
+          { id: 'app', title: 'App' },
+          { id: 'system', title: 'System' },
+        ],
+      },
+    ]);
+
+    const cpuSelected = extractPanels(dashboard, 'cpu');
+    expect(cpuSelected.map((panel) => panel.title)).toEqual(['CPU panel', 'App panel']);
+
+    const independent = extractPanels(dashboard, { 'rows/0': 'memory', 'rows/1': 'system' });
+    expect(independent.map((panel) => panel.title)).toEqual(['Memory panel', 'System panel']);
+  });
+
+  it('collects nested tab panels after a parent tab is selected', () => {
+    const dashboard = nestedTabsDashboard();
+
+    expect(listDashboardTabGroups(dashboard)).toEqual([
+      { id: 'root', tabs: [{ id: 'parent', title: 'Parent' }] },
+      {
+        id: 'root/parent',
+        tabs: [
+          { id: 'inner-a', title: 'Inner A' },
+          { id: 'inner-b', title: 'Inner B' },
+        ],
+      },
+    ]);
+
+    expect(extractPanels(dashboard, 'parent')).toHaveLength(1);
+    expect(extractPanels(dashboard, 'parent')[0].title).toBe('Inner A panel');
+
+    expect(extractPanels(dashboard, { root: 'parent', 'root/parent': 'inner-b' })[0].title).toBe('Inner B panel');
+  });
+
+  it('merges sibling tab groups from both versions', () => {
+    const lhs = siblingTabGroupsDashboard();
+    const rhs = {
+      ...lhs,
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            lhs.layout.spec.rows[0],
+            {
+              spec: {
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      ...lhs.layout.spec.rows[1].spec.layout.spec.tabs,
+                      {
+                        metadata: { name: 'audit' },
+                        spec: {
+                          title: 'Audit',
+                          layout: v2Grid('unused'),
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(mergeDashboardTabGroups(lhs, rhs)).toEqual([
+      {
+        id: 'rows/0',
+        tabs: [
+          { id: 'cpu', title: 'CPU' },
+          { id: 'memory', title: 'Memory' },
+        ],
+      },
+      {
+        id: 'rows/1',
+        tabs: [
+          { id: 'app', title: 'App' },
+          { id: 'system', title: 'System' },
+          { id: 'audit', title: 'Audit' },
+        ],
+      },
+    ]);
+  });
 });
+
+function v2Panel(title: string) {
+  return {
+    spec: {
+      title,
+      vizConfig: { group: 'stat' },
+      data: { spec: { queries: [] } },
+    },
+  };
+}
+
+function v2Grid(elementName: string) {
+  return {
+    kind: 'GridLayout',
+    spec: {
+      items: [{ spec: { element: { name: elementName }, x: 0, y: 0, width: 12, height: 8 } }],
+    },
+  };
+}
+
+function siblingTabGroupsDashboard() {
+  return {
+    elements: {
+      cpu: v2Panel('CPU panel'),
+      memory: v2Panel('Memory panel'),
+      app: v2Panel('App panel'),
+      system: v2Panel('System panel'),
+    },
+    layout: {
+      kind: 'RowsLayout',
+      spec: {
+        rows: [
+          {
+            spec: {
+              layout: {
+                kind: 'TabsLayout',
+                spec: {
+                  tabs: [
+                    { metadata: { name: 'cpu' }, spec: { title: 'CPU', layout: v2Grid('cpu') } },
+                    { metadata: { name: 'memory' }, spec: { title: 'Memory', layout: v2Grid('memory') } },
+                  ],
+                },
+              },
+            },
+          },
+          {
+            spec: {
+              layout: {
+                kind: 'TabsLayout',
+                spec: {
+                  tabs: [
+                    { metadata: { name: 'app' }, spec: { title: 'App', layout: v2Grid('app') } },
+                    { metadata: { name: 'system' }, spec: { title: 'System', layout: v2Grid('system') } },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+}
+
+function nestedTabsDashboard() {
+  return {
+    elements: {
+      innerA: v2Panel('Inner A panel'),
+      innerB: v2Panel('Inner B panel'),
+    },
+    layout: {
+      kind: 'TabsLayout',
+      spec: {
+        tabs: [
+          {
+            metadata: { name: 'parent' },
+            spec: {
+              title: 'Parent',
+              layout: {
+                kind: 'TabsLayout',
+                spec: {
+                  tabs: [
+                    { metadata: { name: 'inner-a' }, spec: { title: 'Inner A', layout: v2Grid('innerA') } },
+                    { metadata: { name: 'inner-b' }, spec: { title: 'Inner B', layout: v2Grid('innerB') } },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  };
+}
