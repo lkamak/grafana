@@ -7288,6 +7288,7 @@
       "description": "Each panel is marked added, removed, changed, moved, or unchanged. Click a changed panel to see title, query, visualization, and threshold diffs.",
       "empty-canvas": "No panels in this version.",
       "field-layout": "Layout",
+      "field-library-panel": "Library panel",
       "field-query": "Query",
       "field-thresholds": "Thresholds",
       "field-title": "Title",

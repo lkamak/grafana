@@ -167,6 +167,42 @@ describe('panelVersionDiff', () => {
     expect(diff.every((item) => item.kind === 'unchanged')).toBe(true);
   });
 
+  it('marks a v2 library panel swap as changed', () => {
+    const libraryDashboard = (uid: string, name: string) => ({
+      elements: {
+        panelA: {
+          kind: 'LibraryPanel',
+          spec: {
+            id: 1,
+            title: 'Shared title',
+            libraryPanel: { uid, name },
+          },
+        },
+      },
+      layout: {
+        kind: 'GridLayout',
+        spec: {
+          items: [{ spec: { element: { name: 'panelA' }, x: 0, y: 0, width: 12, height: 8 } }],
+        },
+      },
+    });
+
+    const diff = diffDashboardPanels(
+      libraryDashboard('lib-cpu', 'CPU library'),
+      libraryDashboard('lib-mem', 'Memory library')
+    );
+
+    expect(diff).toHaveLength(1);
+    expect(diff[0].kind).toBe('changed');
+    expect(diff[0].changes).toEqual([
+      {
+        field: 'library panel',
+        before: 'CPU library (lib-cpu)',
+        after: 'Memory library (lib-mem)',
+      },
+    ]);
+  });
+
   it('extracts panels from v2 grid layout', () => {
     const dashboard = {
       elements: {
@@ -327,6 +363,65 @@ describe('panelVersionDiff', () => {
     expect(extractPanels(dashboard, 'tab-one')).toHaveLength(1);
     expect(extractPanels(dashboard, 'tab-one')[0].title).toBe('Tab one panel');
     expect(extractPanels(dashboard, 'tab-two')[0].title).toBe('Tab two panel');
+  });
+
+  it('keeps tabs with the same title distinct when metadata.name is absent', () => {
+    const dashboard = {
+      elements: {
+        panelA: {
+          spec: {
+            title: 'First tab panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+        panelB: {
+          spec: {
+            title: 'Second tab panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            {
+              spec: {
+                title: 'Overview',
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [{ spec: { element: { name: 'panelA' }, x: 0, y: 0, width: 12, height: 8 } }],
+                  },
+                },
+              },
+            },
+            {
+              spec: {
+                title: 'Overview',
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [{ spec: { element: { name: 'panelB' }, x: 0, y: 0, width: 12, height: 8 } }],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(listDashboardTabs(dashboard)).toEqual([
+      { id: 'tab-0', title: 'Overview' },
+      { id: 'tab-1', title: 'Overview' },
+    ]);
+    expect(extractPanels(dashboard, 'tab-0')).toHaveLength(1);
+    expect(extractPanels(dashboard, 'tab-0')[0].title).toBe('First tab panel');
+    expect(extractPanels(dashboard, 'tab-1')).toHaveLength(1);
+    expect(extractPanels(dashboard, 'tab-1')[0].title).toBe('Second tab panel');
   });
 
   it('merges tabs from both versions', () => {

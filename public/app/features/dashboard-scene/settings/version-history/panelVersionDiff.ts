@@ -11,7 +11,7 @@ export type PanelGridPos = {
   h: number;
 };
 
-export type PanelFieldName = 'title' | 'query' | 'viz type' | 'thresholds' | 'layout';
+export type PanelFieldName = 'title' | 'query' | 'viz type' | 'thresholds' | 'library panel' | 'layout';
 
 export type PanelFieldChange = {
   field: PanelFieldName;
@@ -26,6 +26,7 @@ export type PanelSnapshot = {
   gridPos: PanelGridPos;
   query: string;
   thresholds: string;
+  libraryPanel: string;
   tabId?: string;
 };
 
@@ -56,16 +57,9 @@ export function listDashboardTabs(dashboard: unknown): DashboardTab[] | undefine
   }
 
   return tabs.map((tab, index) => {
-    const tabSpec = isRecord(tab.spec) ? tab.spec : tab;
+    const tabSpec = isRecord(tab) && isRecord(tab.spec) ? tab.spec : isRecord(tab) ? tab : {};
     const title = typeof tabSpec.title === 'string' && tabSpec.title ? tabSpec.title : `Tab ${index + 1}`;
-    const metadata = isRecord(tab.metadata) ? tab.metadata : undefined;
-    const id =
-      metadata && typeof metadata.name === 'string' && metadata.name
-        ? metadata.name
-        : typeof tabSpec.title === 'string' && tabSpec.title
-          ? tabSpec.title
-          : `tab-${index}`;
-    return { id, title };
+    return { id: tabToId(tab, index), title };
   });
 }
 
@@ -164,6 +158,13 @@ function diffPanelFields(base: PanelSnapshot, next: PanelSnapshot): PanelFieldCh
       after: displayOrEmpty(next.thresholds),
     });
   }
+  if (base.libraryPanel !== next.libraryPanel) {
+    changes.push({
+      field: 'library panel',
+      before: displayOrEmpty(base.libraryPanel),
+      after: displayOrEmpty(next.libraryPanel),
+    });
+  }
   if (!isEqual(base.gridPos, next.gridPos)) {
     changes.push({
       field: 'layout',
@@ -233,13 +234,29 @@ function snapshotFromV1Panel(panel: Record<string, unknown>): PanelSnapshot {
     gridPos: readGridPos(panel.gridPos),
     query: summarizeQueries(panel.targets),
     thresholds: summarizeThresholds(readV1Thresholds(panel)),
+    libraryPanel: summarizeLibraryPanel(panel.libraryPanel),
   };
 }
 
 function collectV2Panels(spec: Record<string, unknown>, tabId?: string): PanelSnapshot[] {
   const elements = isRecord(spec.elements) ? spec.elements : {};
   const snapshots: PanelSnapshot[] = [];
-  walkV2Layout(spec.layout, elements, 0, snapshots, tabId);
+
+  // TabsLayoutTab has no stable name in the v2 schema, so ids are assigned from
+  // the flattened tab list. Resolve that tab here and walk only its layout so
+  // duplicate titles and multiple tab layouts stay distinct.
+  if (tabId) {
+    const tabs = collectTabsFromLayout(spec.layout);
+    const match = tabs.find((tab, index) => tabToId(tab, index) === tabId);
+    if (!isRecord(match)) {
+      return [];
+    }
+    const tabSpec = isRecord(match.spec) ? match.spec : match;
+    walkV2Layout(tabSpec.layout, elements, 0, snapshots, tabId);
+    return snapshots;
+  }
+
+  walkV2Layout(spec.layout, elements, 0, snapshots);
   return snapshots;
 }
 
@@ -374,13 +391,9 @@ function tabToId(tab: unknown, index: number): string {
   if (!isRecord(tab)) {
     return `tab-${index}`;
   }
-  const tabSpec = isRecord(tab.spec) ? tab.spec : tab;
   const metadata = isRecord(tab.metadata) ? tab.metadata : undefined;
   if (metadata && typeof metadata.name === 'string' && metadata.name) {
     return metadata.name;
-  }
-  if (typeof tabSpec.title === 'string' && tabSpec.title) {
-    return tabSpec.title;
   }
   return `tab-${index}`;
 }
@@ -403,6 +416,7 @@ function snapshotFromV2Panel(panel: Record<string, unknown>, gridPos: PanelGridP
     gridPos,
     query: summarizeQueries(dataSpec.queries),
     thresholds: summarizeThresholds(defaults.thresholds),
+    libraryPanel: summarizeLibraryPanel(spec.libraryPanel),
     tabId,
   };
 }
@@ -480,6 +494,19 @@ function formatQuery(query: unknown): string {
   } catch {
     return '';
   }
+}
+
+function summarizeLibraryPanel(raw: unknown): string {
+  if (!isRecord(raw)) {
+    return '';
+  }
+
+  const name = typeof raw.name === 'string' ? raw.name : '';
+  const uid = typeof raw.uid === 'string' ? raw.uid : '';
+  if (name && uid) {
+    return `${name} (${uid})`;
+  }
+  return name || uid;
 }
 
 function summarizeThresholds(raw: unknown): string {

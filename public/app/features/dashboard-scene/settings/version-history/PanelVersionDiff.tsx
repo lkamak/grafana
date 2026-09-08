@@ -293,6 +293,8 @@ function fieldLabel(field: PanelVersionDiffItem['changes'][number]['field']): st
       return t('dashboard-scene.panel-version-diff.field-viz-type', 'Visualization');
     case 'thresholds':
       return t('dashboard-scene.panel-version-diff.field-thresholds', 'Thresholds');
+    case 'library panel':
+      return t('dashboard-scene.panel-version-diff.field-library-panel', 'Library panel');
     case 'layout':
       return t('dashboard-scene.panel-version-diff.field-layout', 'Layout');
   }

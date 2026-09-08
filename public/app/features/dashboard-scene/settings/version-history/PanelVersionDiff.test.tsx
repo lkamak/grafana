@@ -202,6 +202,103 @@ describe('PanelVersionDiff', () => {
     expect(screen.getAllByText('Details panel')).toHaveLength(2);
   });
 
+  it('marks a library panel swap as changed', () => {
+    const libraryDashboard = (uid: string, name: string) => ({
+      elements: {
+        panelA: {
+          kind: 'LibraryPanel',
+          spec: {
+            id: 1,
+            title: 'Shared title',
+            libraryPanel: { uid, name },
+          },
+        },
+      },
+      layout: {
+        kind: 'GridLayout',
+        spec: {
+          items: [{ spec: { element: { name: 'panelA' }, x: 0, y: 0, width: 12, height: 8 } }],
+        },
+      },
+    });
+
+    renderDiff({
+      lhs: libraryDashboard('lib-cpu', 'CPU library'),
+      rhs: libraryDashboard('lib-mem', 'Memory library'),
+    });
+
+    fireEvent.click(screen.getByTestId(selectors.pages.Dashboard.Settings.Versions.panelTile('1', 'next')));
+
+    expect(screen.getByText('Library panel')).toBeInTheDocument();
+    expect(screen.getByText('CPU library (lib-cpu)')).toBeInTheDocument();
+    expect(screen.getByText('Memory library (lib-mem)')).toBeInTheDocument();
+  });
+
+  it('shows each tab when two tabs share a title and have no metadata.name', () => {
+    const duplicateTitleDashboard = () => ({
+      elements: {
+        'panel-first': {
+          spec: {
+            title: 'First tab panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+        'panel-second': {
+          spec: {
+            title: 'Second tab panel',
+            vizConfig: { group: 'stat' },
+            data: { spec: { queries: [] } },
+          },
+        },
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            {
+              spec: {
+                title: 'Overview',
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [{ spec: { element: { name: 'panel-first' }, x: 0, y: 0, width: 12, height: 8 } }],
+                  },
+                },
+              },
+            },
+            {
+              spec: {
+                title: 'Overview',
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [{ spec: { element: { name: 'panel-second' }, x: 0, y: 0, width: 12, height: 8 } }],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    renderDiff({
+      lhs: duplicateTitleDashboard(),
+      rhs: duplicateTitleDashboard(),
+    });
+
+    const tabOptions = screen.getAllByRole('radio', { name: 'Overview' });
+    expect(tabOptions).toHaveLength(2);
+    expect(screen.getAllByText('First tab panel')).toHaveLength(2);
+    expect(screen.queryByText('Second tab panel')).not.toBeInTheDocument();
+
+    fireEvent.click(tabOptions[1]);
+
+    expect(screen.queryByText('First tab panel')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Second tab panel')).toHaveLength(2);
+  });
+
   it('renders a tab picker for tabs nested inside a rows layout', () => {
     const nestedTabDashboard = () => ({
       elements: {
