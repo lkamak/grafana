@@ -346,6 +346,24 @@ export const versionedPages = {
           '11.2.0': 'General',
         },
       },
+      Versions: {
+        tabPicker: {
+          '13.2.0': 'data-testid Dashboard settings versions tab picker',
+        },
+        compareRow: {
+          '13.2.0': 'data-testid Dashboard settings versions compare row',
+        },
+        baseCanvas: {
+          '13.2.0': 'data-testid Dashboard settings versions base canvas',
+        },
+        newCanvas: {
+          '13.2.0': 'data-testid Dashboard settings versions new canvas',
+        },
+        panelTile: {
+          '13.2.0': (panelId: string, side: string) =>
+            `data-testid Dashboard settings versions panel tile ${panelId} ${side}`,
+        },
+      },
       Annotations: {
         Edit: {
           urlParams: {
