@@ -260,6 +260,54 @@ describe('extractPanelsFromSpec', () => {
     expect(result.panels[0].gridPos).toEqual({ x: 0, y: 1, w: 12, h: 8 });
     expect(result.panels[1].gridPos).toEqual({ x: 0, y: 9, w: 12, h: 8 });
   });
+
+  it('places panels after multiple collapsed v1 rows without compounding hidden height', () => {
+    const spec = {
+      schemaVersion: 39,
+      panels: [
+        {
+          type: 'row',
+          title: 'First',
+          collapsed: true,
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          panels: [
+            {
+              id: 1,
+              title: 'In row 1',
+              type: 'stat',
+              gridPos: { x: 0, y: 1, w: 12, h: 8 },
+            },
+          ],
+        },
+        {
+          type: 'row',
+          title: 'Second',
+          collapsed: true,
+          gridPos: { x: 0, y: 1, w: 24, h: 1 },
+          panels: [
+            {
+              id: 2,
+              title: 'In row 2',
+              type: 'stat',
+              gridPos: { x: 0, y: 10, w: 12, h: 8 },
+            },
+          ],
+        },
+        {
+          id: 3,
+          title: 'After rows',
+          type: 'stat',
+          gridPos: { x: 0, y: 2, w: 12, h: 8 },
+        },
+      ],
+    };
+
+    const result = extractPanelsFromSpec(spec);
+    expect(result.panels).toHaveLength(3);
+    expect(result.panels[0].gridPos).toEqual({ x: 0, y: 1, w: 12, h: 8 });
+    expect(result.panels[1].gridPos).toEqual({ x: 0, y: 10, w: 12, h: 8 });
+    expect(result.panels[2].gridPos).toEqual({ x: 0, y: 18, w: 12, h: 8 });
+  });
 });
 
 describe('buildVisualDiff', () => {
@@ -339,6 +387,42 @@ describe('buildVisualDiff', () => {
 
     const diff = buildVisualDiff(expanded, collapsed);
     const entries = diff.entriesByTab.default;
+    expect(entries.every((entry) => entry.status === 'unchanged' && !entry.moved)).toBe(true);
+  });
+
+  it('does not treat collapse-only shifts as moves when multiple v1 rows collapse', () => {
+    const expanded = {
+      schemaVersion: 39,
+      panels: [
+        { type: 'row', collapsed: false, gridPos: { x: 0, y: 0, w: 24, h: 1 }, panels: [] },
+        { id: 1, title: 'In row 1', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } },
+        { type: 'row', collapsed: false, gridPos: { x: 0, y: 9, w: 24, h: 1 }, panels: [] },
+        { id: 2, title: 'In row 2', type: 'stat', gridPos: { x: 0, y: 10, w: 12, h: 8 } },
+        { id: 3, title: 'After', type: 'stat', gridPos: { x: 0, y: 18, w: 12, h: 8 } },
+      ],
+    };
+    const collapsed = {
+      schemaVersion: 39,
+      panels: [
+        {
+          type: 'row',
+          collapsed: true,
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          panels: [{ id: 1, title: 'In row 1', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } }],
+        },
+        {
+          type: 'row',
+          collapsed: true,
+          gridPos: { x: 0, y: 1, w: 24, h: 1 },
+          panels: [{ id: 2, title: 'In row 2', type: 'stat', gridPos: { x: 0, y: 10, w: 12, h: 8 } }],
+        },
+        { id: 3, title: 'After', type: 'stat', gridPos: { x: 0, y: 2, w: 12, h: 8 } },
+      ],
+    };
+
+    const diff = buildVisualDiff(expanded, collapsed);
+    const entries = diff.entriesByTab.default;
+    expect(entries).toHaveLength(3);
     expect(entries.every((entry) => entry.status === 'unchanged' && !entry.moved)).toBe(true);
   });
 

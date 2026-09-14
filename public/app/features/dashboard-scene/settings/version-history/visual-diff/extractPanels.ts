@@ -70,9 +70,12 @@ function walkV1PanelList(
       const nested = panel.panels;
       const rowY = gridPosFromUnknown(panel.gridPos)?.y ?? 0;
       if (Array.isArray(nested)) {
-        flowOrder = walkV1PanelList(nested, tabId, tabTitle, yOffset + rowY, out, flowOrder, yShift);
+        // Collapsed-row children already store expanded y. Do not apply the
+        // compact-compensation accumulated from earlier rows.
+        const nestedShift = panel.collapsed === true ? { value: 0 } : yShift;
+        flowOrder = walkV1PanelList(nested, tabId, tabTitle, yOffset + rowY, out, flowOrder, nestedShift);
         if (panel.collapsed === true) {
-          yShift.value += collapsedRowPushDown(panel, nested);
+          yShift.value += collapsedRowPushDown(panel, nested, yShift.value);
         }
       }
       continue;
@@ -88,12 +91,14 @@ function walkV1PanelList(
   return flowOrder;
 }
 
-function collapsedRowPushDown(row: UnknownRecord, rowPanels: unknown[]): number {
+function collapsedRowPushDown(row: UnknownRecord, rowPanels: unknown[], compactedRowYShift = 0): number {
   if (rowPanels.length === 0) {
     return 0;
   }
 
-  const rowY = gridPosFromUnknown(row.gridPos)?.y ?? 0;
+  // Later collapsed rows are stored at compacted y; restore the expanded row
+  // coordinate before measuring this row's hidden height.
+  const rowY = (gridPosFromUnknown(row.gridPos)?.y ?? 0) + compactedRowYShift;
   let yMax = rowY + 1;
   for (const child of rowPanels) {
     if (!child || typeof child !== 'object') {
