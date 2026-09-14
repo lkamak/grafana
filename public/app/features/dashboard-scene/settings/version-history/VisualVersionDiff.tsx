@@ -27,9 +27,10 @@ export function VisualVersionDiff({ lhs, rhs }: Props) {
 
   const activeTabId = diffResult.tabs.some((tab) => tab.id === selectedTabId)
     ? selectedTabId
-    : diffResult.tabs[0]?.id ?? 'default';
+    : (diffResult.tabs[0]?.id ?? 'default');
 
   const items = diffResult.itemsByTab[activeTabId] ?? [];
+  const layoutKind = diffResult.layoutKindByTab[activeTabId] ?? 'grid';
   const canvasHeight = getCanvasHeight(items);
 
   const tabOptions = diffResult.tabs.map((tab) => ({
@@ -62,7 +63,7 @@ export function VisualVersionDiff({ lhs, rhs }: Props) {
         />
       )}
 
-      {diffResult.layoutKind === 'autoGrid' ? (
+      {layoutKind === 'autoGrid' ? (
         <AutoGridPanelList items={items} onSelect={setSelectedPanel} styles={styles} />
       ) : (
         <div className={styles.canvas} style={{ height: canvasHeight }} data-testid="visual-version-diff-canvas">
@@ -70,9 +71,7 @@ export function VisualVersionDiff({ lhs, rhs }: Props) {
         </div>
       )}
 
-      {selectedPanel && (
-        <VisualPanelDiffDrawer item={selectedPanel} onClose={() => setSelectedPanel(null)} />
-      )}
+      {selectedPanel && <VisualPanelDiffDrawer item={selectedPanel} onClose={() => setSelectedPanel(null)} />}
     </Stack>
   );
 }
@@ -83,11 +82,36 @@ const statusLegend: Array<{
   defaultLabel: string;
   colorIndex: number;
 }> = [
-  { status: 'added', labelKey: 'dashboard-scene.version-history-visual.legend-added', defaultLabel: 'Added', colorIndex: 2 },
-  { status: 'removed', labelKey: 'dashboard-scene.version-history-visual.legend-removed', defaultLabel: 'Removed', colorIndex: 6 },
-  { status: 'changed', labelKey: 'dashboard-scene.version-history-visual.legend-changed', defaultLabel: 'Changed', colorIndex: 1 },
-  { status: 'moved', labelKey: 'dashboard-scene.version-history-visual.legend-moved', defaultLabel: 'Moved', colorIndex: 4 },
-  { status: 'unchanged', labelKey: 'dashboard-scene.version-history-visual.legend-unchanged', defaultLabel: 'Unchanged', colorIndex: 7 },
+  {
+    status: 'added',
+    labelKey: 'dashboard-scene.version-history-visual.legend-added',
+    defaultLabel: 'Added',
+    colorIndex: 2,
+  },
+  {
+    status: 'removed',
+    labelKey: 'dashboard-scene.version-history-visual.legend-removed',
+    defaultLabel: 'Removed',
+    colorIndex: 6,
+  },
+  {
+    status: 'changed',
+    labelKey: 'dashboard-scene.version-history-visual.legend-changed',
+    defaultLabel: 'Changed',
+    colorIndex: 1,
+  },
+  {
+    status: 'moved',
+    labelKey: 'dashboard-scene.version-history-visual.legend-moved',
+    defaultLabel: 'Moved',
+    colorIndex: 4,
+  },
+  {
+    status: 'unchanged',
+    labelKey: 'dashboard-scene.version-history-visual.legend-unchanged',
+    defaultLabel: 'Unchanged',
+    colorIndex: 7,
+  },
 ];
 
 function renderGridItems(
@@ -112,7 +136,7 @@ function renderGridItems(
 
   if (item.status === 'removed' && item.gridPos) {
     nodes.push(
-      <PanelCard key={`${item.id}-removed`} item={item} ghost gridPos={item.gridPos} styles={styles} onSelect={onSelect} />
+      <PanelCard key={`${item.id}-removed`} item={item} gridPos={item.gridPos} styles={styles} onSelect={onSelect} />
     );
     return nodes;
   }
@@ -209,7 +233,9 @@ function AutoGridPanelList({
             data-status={item.status}
           >
             <Stack direction="column" gap={0.5}>
-              <Text weight="medium">{item.title || t('dashboard-scene.version-history-visual.untitled-panel', 'Untitled panel')}</Text>
+              <Text weight="medium">
+                {item.title || t('dashboard-scene.version-history-visual.untitled-panel', 'Untitled panel')}
+              </Text>
               <Text variant="bodySmall" color="secondary">
                 {item.vizType}
               </Text>

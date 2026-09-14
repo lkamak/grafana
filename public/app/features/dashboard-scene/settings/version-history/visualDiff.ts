@@ -52,7 +52,7 @@ export type VisualDiffTab = {
 export type VisualDiffResult = {
   tabs: VisualDiffTab[];
   isTabbed: boolean;
-  layoutKind: 'grid' | 'autoGrid';
+  layoutKindByTab: Record<string, 'grid' | 'autoGrid'>;
   itemsByTab: Record<string, PanelDiffItem[]>;
 };
 
@@ -80,7 +80,9 @@ function isV2Spec(spec: unknown): spec is V2Spec {
 }
 
 function isV1Dashboard(spec: unknown): spec is { panels?: Panel[] } {
-  return typeof spec === 'object' && spec !== null && 'panels' in spec && Array.isArray((spec as { panels: unknown }).panels);
+  return (
+    typeof spec === 'object' && spec !== null && 'panels' in spec && Array.isArray((spec as { panels: unknown }).panels)
+  );
 }
 
 export function buildVisualDiff(lhs: object, rhs: object): VisualDiffResult {
@@ -105,27 +107,33 @@ export function buildVisualDiff(lhs: object, rhs: object): VisualDiffResult {
   const tabs = tabOrder.length > 0 ? tabOrder : [DEFAULT_TAB];
   const isTabbed = lhsTabs.length > 1 || rhsTabs.length > 1 || tabs.some((t) => t.id !== DEFAULT_TAB.id);
 
-  const layoutKind =
-    lhsTabs.some((t) => t.layoutKind === 'autoGrid') || rhsTabs.some((t) => t.layoutKind === 'autoGrid')
-      ? 'autoGrid'
-      : 'grid';
-
   const itemsByTab: Record<string, PanelDiffItem[]> = {};
+  const layoutKindByTab: Record<string, 'grid' | 'autoGrid'> = {};
 
   for (const tab of tabs) {
-    const tabKey = tab.title.trim() || tab.id;
-    const lhsPanels =
-      lhsTabs.find((t) => t.tabId === tab.id || t.tabTitle.trim() === tabKey)?.panels ??
-      lhsTabs.find((t) => tabTitleToId.get(t.tabTitle.trim() || t.tabId) === tab.id)?.panels ??
-      [];
-    const rhsPanels =
-      rhsTabs.find((t) => t.tabId === tab.id || t.tabTitle.trim() === tabKey)?.panels ??
-      rhsTabs.find((t) => tabTitleToId.get(t.tabTitle.trim() || t.tabId) === tab.id)?.panels ??
-      [];
-    itemsByTab[tab.id] = classifyPanels(lhsPanels, rhsPanels);
+    const lhsTab = findMatchingTab(lhsTabs, tab, tabTitleToId);
+    const rhsTab = findMatchingTab(rhsTabs, tab, tabTitleToId);
+    itemsByTab[tab.id] = classifyPanels(lhsTab?.panels ?? [], rhsTab?.panels ?? []);
+    layoutKindByTab[tab.id] = mergeLayoutKind(lhsTab?.layoutKind, rhsTab?.layoutKind);
   }
 
-  return { tabs, isTabbed, layoutKind, itemsByTab };
+  return { tabs, isTabbed, layoutKindByTab, itemsByTab };
+}
+
+function findMatchingTab(
+  source: TabPanels[],
+  tab: VisualDiffTab,
+  tabTitleToId: Map<string, string>
+): TabPanels | undefined {
+  const tabKey = tab.title.trim() || tab.id;
+  return (
+    source.find((t) => t.tabId === tab.id || t.tabTitle.trim() === tabKey) ??
+    source.find((t) => tabTitleToId.get(t.tabTitle.trim() || t.tabId) === tab.id)
+  );
+}
+
+function mergeLayoutKind(...kinds: Array<'grid' | 'autoGrid' | undefined>): 'grid' | 'autoGrid' {
+  return kinds.some((kind) => kind === 'autoGrid') ? 'autoGrid' : 'grid';
 }
 
 function extractTabPanels(spec: object): TabPanels[] {
@@ -181,7 +189,10 @@ function extractV2TabPanels(spec: V2Spec): TabPanels[] {
 }
 
 function tabKeyFromTitle(title: string, index: number): string {
-  const slug = title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  const slug = title
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '');
   return slug ? `tab-${slug}-${index}` : `tab-${index}`;
 }
 
@@ -195,19 +206,27 @@ function walkV2Layout(
   switch (layout.kind) {
     case 'GridLayout':
       return {
-        panels: collectV2GridItems((layout.spec.items as Array<{ spec: Record<string, unknown> }>) ?? [], elements, tabId, tabTitle, yOffset),
+        panels: collectV2GridItems(
+          (layout.spec.items as Array<{ spec: Record<string, unknown> }>) ?? [],
+          elements,
+          tabId,
+          tabTitle,
+          yOffset
+        ),
         layoutKind: 'grid',
       };
     case 'RowsLayout': {
       const rows = (layout.spec.rows as Array<{ spec: { layout: V2Layout } }>) ?? [];
       const panels: PanelSnapshot[] = [];
+      const childKinds: Array<'grid' | 'autoGrid'> = [];
       let offset = yOffset;
       for (const row of rows) {
         const rowResult = walkV2Layout(row.spec.layout, elements, tabId, tabTitle, offset);
         panels.push(...rowResult.panels);
+        childKinds.push(rowResult.layoutKind);
         offset += rowLayoutHeight(row.spec.layout, elements) + 1;
       }
-      return { panels, layoutKind: 'grid' };
+      return { panels, layoutKind: mergeLayoutKind(...childKinds) };
     }
     case 'AutoGridLayout': {
       const items = (layout.spec.items as Array<{ spec: { element: { name: string } } }>) ?? [];
@@ -222,11 +241,13 @@ function walkV2Layout(
       // Nested tabs: flatten into current tab context (do not merge sibling tabs).
       const tabs = (layout.spec.tabs as Array<{ spec: { title?: string; layout: V2Layout } }>) ?? [];
       const panels: PanelSnapshot[] = [];
+      const childKinds: Array<'grid' | 'autoGrid'> = [];
       for (let i = 0; i < tabs.length; i++) {
         const nested = walkV2Layout(tabs[i].spec.layout, elements, tabId, tabTitle, yOffset);
         panels.push(...nested.panels);
+        childKinds.push(nested.layoutKind);
       }
-      return { panels, layoutKind: 'grid' };
+      return { panels, layoutKind: mergeLayoutKind(...childKinds) };
     }
     default:
       return { panels: [], layoutKind: 'grid' };
@@ -314,8 +335,12 @@ function panelSnapshotFromV2Panel(
   gridPos: GridPos | null
 ): PanelSnapshot {
   const spec = panelKind.spec;
-  const vizConfig = spec.vizConfig as { group?: string; spec?: { fieldConfig?: { defaults?: { thresholds?: unknown } } } } | undefined;
-  const data = spec.data as { spec?: { queries?: Array<{ spec: { refId: string; query: { spec?: Record<string, unknown> } } }> } } | undefined;
+  const vizConfig = spec.vizConfig as
+    | { group?: string; spec?: { fieldConfig?: { defaults?: { thresholds?: unknown } } } }
+    | undefined;
+  const data = spec.data as
+    | { spec?: { queries?: Array<{ spec: { refId: string; query: { spec?: Record<string, unknown> } } }> } }
+    | undefined;
 
   const id = Number(spec.id ?? 0);
   const title = String(spec.title ?? '');
@@ -398,7 +423,9 @@ function extractV1Queries(targets: Panel['targets']): QuerySummary[] {
 }
 
 function extractV2Queries(
-  data: { spec?: { queries?: Array<{ spec: { refId: string; query: { spec?: Record<string, unknown> } } }> } } | undefined
+  data:
+    | { spec?: { queries?: Array<{ spec: { refId: string; query: { spec?: Record<string, unknown> } } }> } }
+    | undefined
 ): QuerySummary[] {
   const queries = data?.spec?.queries ?? [];
   return queries.map((q) => {

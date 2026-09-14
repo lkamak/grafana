@@ -4,13 +4,25 @@ describe('buildVisualDiff', () => {
   it('classifies v1 panel add, remove, change, and move', () => {
     const lhs = {
       panels: [
-        { id: 1, type: 'timeseries', title: 'CPU', gridPos: { x: 0, y: 0, w: 12, h: 8 }, targets: [{ refId: 'A', expr: 'up' }] },
+        {
+          id: 1,
+          type: 'timeseries',
+          title: 'CPU',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+          targets: [{ refId: 'A', expr: 'up' }],
+        },
         { id: 2, type: 'stat', title: 'Memory', gridPos: { x: 12, y: 0, w: 12, h: 8 }, targets: [] },
       ],
     };
     const rhs = {
       panels: [
-        { id: 1, type: 'timeseries', title: 'CPU usage', gridPos: { x: 0, y: 0, w: 12, h: 8 }, targets: [{ refId: 'A', expr: 'up' }] },
+        {
+          id: 1,
+          type: 'timeseries',
+          title: 'CPU usage',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+          targets: [{ refId: 'A', expr: 'up' }],
+        },
         { id: 3, type: 'gauge', title: 'Disk', gridPos: { x: 12, y: 0, w: 12, h: 8 }, targets: [] },
         { id: 2, type: 'stat', title: 'Memory', gridPos: { x: 0, y: 8, w: 12, h: 8 }, targets: [] },
       ],
@@ -87,7 +99,12 @@ describe('buildVisualDiff', () => {
             id: 1,
             title: 'On tab A',
             data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
-            vizConfig: { kind: 'VizConfig', group: 'timeseries', version: '1', spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'timeseries',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
           },
         },
         'panel-2': {
@@ -96,7 +113,12 @@ describe('buildVisualDiff', () => {
             id: 2,
             title: 'On tab B',
             data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
-            vizConfig: { kind: 'VizConfig', group: 'stat', version: '1', spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
           },
         },
       },
@@ -147,5 +169,148 @@ describe('buildVisualDiff', () => {
     expect(labels).toContain('Query A');
     expect(labels).toContain('Thresholds');
     expect(labels).toContain('Position');
+  });
+
+  it('keeps rows-of-auto-grid panels and reports autoGrid layout', () => {
+    const dashboard = {
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            {
+              kind: 'RowsLayoutRow',
+              spec: {
+                title: 'Row 1',
+                layout: {
+                  kind: 'AutoGridLayout',
+                  spec: {
+                    items: [
+                      {
+                        kind: 'AutoGridLayoutItem',
+                        spec: { element: { kind: 'ElementReference', name: 'panel-1' } },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      elements: {
+        'panel-1': {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Auto row panel',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'timeseries',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+      },
+    };
+
+    const result = buildVisualDiff(dashboard, dashboard);
+
+    expect(result.layoutKindByTab.default).toBe('autoGrid');
+    expect(result.itemsByTab.default).toHaveLength(1);
+    expect(result.itemsByTab.default[0].id).toBe(1);
+    expect(result.itemsByTab.default[0].gridPos).toBeNull();
+  });
+
+  it('tracks layout kind per tab when tabs mix grid and auto-grid', () => {
+    const dashboard = {
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            {
+              kind: 'TabsLayoutTab',
+              spec: {
+                title: 'Grid tab',
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [
+                      {
+                        kind: 'GridLayoutItem',
+                        spec: {
+                          x: 0,
+                          y: 0,
+                          width: 12,
+                          height: 8,
+                          element: { kind: 'ElementReference', name: 'panel-1' },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              kind: 'TabsLayoutTab',
+              spec: {
+                title: 'Auto tab',
+                layout: {
+                  kind: 'AutoGridLayout',
+                  spec: {
+                    items: [
+                      {
+                        kind: 'AutoGridLayoutItem',
+                        spec: { element: { kind: 'ElementReference', name: 'panel-2' } },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      elements: {
+        'panel-1': {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Grid panel',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'timeseries',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+        'panel-2': {
+          kind: 'Panel',
+          spec: {
+            id: 2,
+            title: 'Auto panel',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+      },
+    };
+
+    const result = buildVisualDiff(dashboard, dashboard);
+    const gridTabId = result.tabs.find((t) => t.title === 'Grid tab')!.id;
+    const autoTabId = result.tabs.find((t) => t.title === 'Auto tab')!.id;
+
+    expect(result.layoutKindByTab[gridTabId]).toBe('grid');
+    expect(result.layoutKindByTab[autoTabId]).toBe('autoGrid');
+    expect(result.itemsByTab[gridTabId].map((p) => p.id)).toEqual([1]);
+    expect(result.itemsByTab[autoTabId].map((p) => p.id)).toEqual([2]);
   });
 });
