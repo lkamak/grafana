@@ -3,16 +3,7 @@ import { useMemo, useState } from 'react';
 
 import { type GrafanaTheme2 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
-import {
-  Alert,
-  Badge,
-  Drawer,
-  RadioButtonGroup,
-  Stack,
-  Text,
-  useStyles2,
-  useTheme2,
-} from '@grafana/ui';
+import { Alert, Badge, Drawer, RadioButtonGroup, Stack, Text, useStyles2, useTheme2 } from '@grafana/ui';
 import { GRID_CELL_HEIGHT, GRID_CELL_VMARGIN, GRID_COLUMN_COUNT } from 'app/core/constants';
 
 import { buildVisualDiff, tabHasDiffEntries } from './diffPanels';
@@ -47,17 +38,14 @@ export function VisualVersionDiff({ baseSpec, newSpec }: VisualVersionDiffProps)
   const theme = useTheme2();
   const diff = useMemo(() => buildVisualDiff(baseSpec, newSpec), [baseSpec, newSpec]);
 
-  const tabsWithEntries = useMemo(
-    () => diff.tabs.filter((tab) => tabHasDiffEntries(tab, diff.entriesByTab)),
-    [diff]
-  );
+  const tabsWithEntries = useMemo(() => diff.tabs.filter((tab) => tabHasDiffEntries(tab, diff.entriesByTab)), [diff]);
 
   const [selectedTabId, setSelectedTabId] = useState<string>(() => tabsWithEntries[0]?.id ?? 'default');
   const [selectedEntry, setSelectedEntry] = useState<PanelDiffEntry | null>(null);
 
   const activeTabId = tabsWithEntries.some((tab) => tab.id === selectedTabId)
     ? selectedTabId
-    : tabsWithEntries[0]?.id ?? 'default';
+    : (tabsWithEntries[0]?.id ?? 'default');
 
   const entries = diff.entriesByTab[activeTabId] ?? [];
   const gridEntries = entries.filter((entry) => entry.layoutMode === 'grid');
@@ -66,7 +54,7 @@ export function VisualVersionDiff({ baseSpec, newSpec }: VisualVersionDiffProps)
   const gridHeight = useMemo(() => {
     let max = 0;
     for (const entry of gridEntries) {
-      const pos = entry.status === 'removed' ? entry.basePanel?.gridPos ?? entry.panel.gridPos : entry.panel.gridPos;
+      const pos = entry.status === 'removed' ? (entry.basePanel?.gridPos ?? entry.panel.gridPos) : entry.panel.gridPos;
       if (pos) {
         max = Math.max(max, pos.y + pos.h);
       }
@@ -121,9 +109,7 @@ export function VisualVersionDiff({ baseSpec, newSpec }: VisualVersionDiffProps)
         >
           {gridEntries.map((entry) => {
             const gridPos =
-              entry.status === 'removed'
-                ? entry.basePanel?.gridPos ?? entry.panel.gridPos
-                : entry.panel.gridPos;
+              entry.status === 'removed' ? (entry.basePanel?.gridPos ?? entry.panel.gridPos) : entry.panel.gridPos;
             if (!gridPos) {
               return null;
             }
@@ -224,19 +210,23 @@ export function VisualVersionDiff({ baseSpec, newSpec }: VisualVersionDiffProps)
 }
 
 function StatusBadge({ status, moved }: { status: PanelDiffStatus; moved: boolean }) {
-  if (moved) {
-    return <Badge text={t('dashboard-scene.visual-version-diff.status-moved', 'Moved')} color="purple" />;
-  }
-  switch (status) {
-    case 'added':
-      return <Badge text={t('dashboard-scene.visual-version-diff.status-added', 'Added')} color="green" />;
-    case 'removed':
-      return <Badge text={t('dashboard-scene.visual-version-diff.status-removed', 'Removed')} color="red" />;
-    case 'changed':
-      return <Badge text={t('dashboard-scene.visual-version-diff.status-changed', 'Changed')} color="orange" />;
-    default:
-      return <Badge text={t('dashboard-scene.visual-version-diff.status-unchanged', 'Unchanged')} color="blue" />;
-  }
+  return (
+    <Stack gap={0.5}>
+      {status === 'added' && (
+        <Badge text={t('dashboard-scene.visual-version-diff.status-added', 'Added')} color="green" />
+      )}
+      {status === 'removed' && (
+        <Badge text={t('dashboard-scene.visual-version-diff.status-removed', 'Removed')} color="red" />
+      )}
+      {status === 'changed' && (
+        <Badge text={t('dashboard-scene.visual-version-diff.status-changed', 'Changed')} color="orange" />
+      )}
+      {status === 'unchanged' && !moved && (
+        <Badge text={t('dashboard-scene.visual-version-diff.status-unchanged', 'Unchanged')} color="blue" />
+      )}
+      {moved && <Badge text={t('dashboard-scene.visual-version-diff.status-moved', 'Moved')} color="purple" />}
+    </Stack>
+  );
 }
 
 function panelCardStyle(theme: GrafanaTheme2, status: PanelDiffStatus, removedGhost: boolean) {

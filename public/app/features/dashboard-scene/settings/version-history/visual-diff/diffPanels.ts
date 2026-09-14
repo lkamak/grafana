@@ -1,4 +1,4 @@
-import { extractPanelsFromSpec, mergeTabDescriptors } from './extractPanels';
+import { alignTabDescriptors, extractPanelsFromSpec, mergeTabDescriptors } from './extractPanels';
 import {
   type ExtractedPanel,
   type PanelChange,
@@ -13,13 +13,11 @@ export function buildVisualDiff(baseSpec: object, newSpec: object): VisualDiffRe
   const newExtract = extractPanelsFromSpec(newSpec);
 
   const mixedSchema =
-    baseExtract.schema !== newExtract.schema &&
-    baseExtract.schema !== 'unknown' &&
-    newExtract.schema !== 'unknown';
+    baseExtract.schema !== newExtract.schema && baseExtract.schema !== 'unknown' && newExtract.schema !== 'unknown';
 
-  const canRenderVisual =
-    !mixedSchema && baseExtract.schema !== 'unknown' && newExtract.schema !== 'unknown';
+  const canRenderVisual = !mixedSchema && baseExtract.schema !== 'unknown' && newExtract.schema !== 'unknown';
 
+  alignTabDescriptors(baseExtract, newExtract);
   const tabs = mergeTabDescriptors(baseExtract.tabs, newExtract.tabs);
   const entriesByTab: Record<string, PanelDiffEntry[]> = {};
 

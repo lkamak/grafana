@@ -157,8 +157,108 @@ describe('extractPanelsFromSpec', () => {
 
     const result = extractPanelsFromSpec(spec);
     expect(result.tabs).toHaveLength(2);
+    expect(result.tabs.map((tab) => tab.id)).toEqual(['tab-overview', 'tab-details']);
     expect(result.panels.find((p) => p.id === 1)?.tabTitle).toBe('Overview');
     expect(result.panels.find((p) => p.id === 2)?.tabTitle).toBe('Details');
+    expect(result.panels.find((p) => p.id === 1)?.tabId).toBe('tab-overview');
+    expect(result.panels.find((p) => p.id === 2)?.tabId).toBe('tab-details');
+  });
+
+  it('stacks v2 rows without compounding y offsets', () => {
+    const spec = {
+      elements: {
+        'panel-1': {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Row 1',
+            data: { kind: 'QueryGroup', spec: { queries: [] } },
+            vizConfig: { kind: 'VizConfig', group: 'stat', spec: {} },
+          },
+        },
+        'panel-2': {
+          kind: 'Panel',
+          spec: {
+            id: 2,
+            title: 'Row 2',
+            data: { kind: 'QueryGroup', spec: { queries: [] } },
+            vizConfig: { kind: 'VizConfig', group: 'stat', spec: {} },
+          },
+        },
+        'panel-3': {
+          kind: 'Panel',
+          spec: {
+            id: 3,
+            title: 'Row 3',
+            data: { kind: 'QueryGroup', spec: { queries: [] } },
+            vizConfig: { kind: 'VizConfig', group: 'stat', spec: {} },
+          },
+        },
+      },
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [1, 2, 3].map((n) => ({
+            kind: 'RowsLayoutRow',
+            spec: {
+              layout: {
+                kind: 'GridLayout',
+                spec: {
+                  items: [
+                    {
+                      kind: 'GridLayoutItem',
+                      spec: {
+                        x: 0,
+                        y: 0,
+                        width: 12,
+                        height: 8,
+                        element: { kind: 'ElementReference', name: `panel-${n}` },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          })),
+        },
+      },
+    };
+
+    const result = extractPanelsFromSpec(spec);
+    expect(result.panels.map((panel) => panel.gridPos?.y)).toEqual([0, 8, 16]);
+  });
+
+  it('places panels after a collapsed v1 row below the hidden children', () => {
+    const spec = {
+      schemaVersion: 39,
+      panels: [
+        {
+          type: 'row',
+          title: 'Overview',
+          collapsed: true,
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          panels: [
+            {
+              id: 1,
+              title: 'Inside row',
+              type: 'stat',
+              gridPos: { x: 0, y: 1, w: 12, h: 8 },
+            },
+          ],
+        },
+        {
+          id: 2,
+          title: 'After row',
+          type: 'stat',
+          gridPos: { x: 0, y: 1, w: 12, h: 8 },
+        },
+      ],
+    };
+
+    const result = extractPanelsFromSpec(spec);
+    expect(result.panels).toHaveLength(2);
+    expect(result.panels[0].gridPos).toEqual({ x: 0, y: 1, w: 12, h: 8 });
+    expect(result.panels[1].gridPos).toEqual({ x: 0, y: 9, w: 12, h: 8 });
   });
 });
 
@@ -213,5 +313,151 @@ describe('buildVisualDiff', () => {
     const diff = buildVisualDiff(baseV1, v2);
     expect(diff.mixedSchema).toBe(true);
     expect(diff.canRenderVisual).toBe(false);
+  });
+
+  it('does not treat collapse-only v1 layout shifts as panel moves', () => {
+    const expanded = {
+      schemaVersion: 39,
+      panels: [
+        { type: 'row', collapsed: false, gridPos: { x: 0, y: 0, w: 24, h: 1 }, panels: [] },
+        { id: 1, title: 'Inside', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } },
+        { id: 2, title: 'After', type: 'stat', gridPos: { x: 0, y: 9, w: 12, h: 8 } },
+      ],
+    };
+    const collapsed = {
+      schemaVersion: 39,
+      panels: [
+        {
+          type: 'row',
+          collapsed: true,
+          gridPos: { x: 0, y: 0, w: 24, h: 1 },
+          panels: [{ id: 1, title: 'Inside', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } }],
+        },
+        { id: 2, title: 'After', type: 'stat', gridPos: { x: 0, y: 1, w: 12, h: 8 } },
+      ],
+    };
+
+    const diff = buildVisualDiff(expanded, collapsed);
+    const entries = diff.entriesByTab.default;
+    expect(entries.every((entry) => entry.status === 'unchanged' && !entry.moved)).toBe(true);
+  });
+
+  it('keeps tab identity when tabs are reordered', () => {
+    const tabsDashboard = (order: Array<'Overview' | 'Details'>) => ({
+      elements: {
+        'panel-a': {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Tab A panel',
+            data: { kind: 'QueryGroup', spec: { queries: [] } },
+            vizConfig: { kind: 'VizConfig', group: 'stat', spec: {} },
+          },
+        },
+        'panel-b': {
+          kind: 'Panel',
+          spec: {
+            id: 2,
+            title: 'Tab B panel',
+            data: { kind: 'QueryGroup', spec: { queries: [] } },
+            vizConfig: { kind: 'VizConfig', group: 'stat', spec: {} },
+          },
+        },
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: order.map((title) => ({
+            kind: 'TabsLayoutTab',
+            spec: {
+              title,
+              layout: {
+                kind: 'GridLayout',
+                spec: {
+                  items: [
+                    {
+                      kind: 'GridLayoutItem',
+                      spec: {
+                        x: 0,
+                        y: 0,
+                        width: 6,
+                        height: 4,
+                        element: {
+                          kind: 'ElementReference',
+                          name: title === 'Overview' ? 'panel-a' : 'panel-b',
+                        },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          })),
+        },
+      },
+    });
+
+    const diff = buildVisualDiff(tabsDashboard(['Overview', 'Details']), tabsDashboard(['Details', 'Overview']));
+    expect(diff.tabs).toHaveLength(2);
+    expect(diff.tabs.map((tab) => tab.id).sort()).toEqual(['tab-details', 'tab-overview']);
+    expect(diff.entriesByTab['tab-overview']).toHaveLength(1);
+    expect(diff.entriesByTab['tab-details']).toHaveLength(1);
+    expect(diff.entriesByTab['tab-overview'][0].moved).toBe(false);
+    expect(diff.entriesByTab['tab-details'][0].moved).toBe(false);
+    expect(diff.entriesByTab['tab-overview'][0].status).toBe('unchanged');
+    expect(diff.entriesByTab['tab-details'][0].status).toBe('unchanged');
+  });
+
+  it('keeps tab identity when a tab is renamed', () => {
+    const tabsDashboard = (title: string) => ({
+      elements: {
+        'panel-a': {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Overview panel',
+            data: { kind: 'QueryGroup', spec: { queries: [] } },
+            vizConfig: { kind: 'VizConfig', group: 'stat', spec: {} },
+          },
+        },
+      },
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            {
+              kind: 'TabsLayoutTab',
+              spec: {
+                title,
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [
+                      {
+                        kind: 'GridLayoutItem',
+                        spec: {
+                          x: 0,
+                          y: 0,
+                          width: 6,
+                          height: 4,
+                          element: { kind: 'ElementReference', name: 'panel-a' },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    });
+
+    const diff = buildVisualDiff(tabsDashboard('Overview'), tabsDashboard('Summary'));
+    expect(diff.tabs).toHaveLength(1);
+    expect(diff.tabs[0].title).toBe('Summary');
+    expect(diff.entriesByTab[diff.tabs[0].id]).toHaveLength(1);
+    expect(diff.entriesByTab[diff.tabs[0].id][0].moved).toBe(false);
+    expect(diff.entriesByTab[diff.tabs[0].id][0].status).toBe('unchanged');
   });
 });

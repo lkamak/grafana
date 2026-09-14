@@ -42,7 +42,11 @@ function extractV1Panels(dashboard: UnknownRecord): ExtractPanelsResult {
     return { schema: 'v1', tabs: [DEFAULT_TAB], panels: [] };
   }
 
-  walkV1PanelList(panelsArray, DEFAULT_TAB.id, DEFAULT_TAB.title, 0, panels, 0);
+  // Collapsed v1 rows keep child gridPos at the expanded coordinates while later
+  // panels are shifted up into those cells. Re-apply the hidden height so tiles
+  // stack as they would after expand, instead of overlapping.
+  const yShift = { value: 0 };
+  walkV1PanelList(panelsArray, DEFAULT_TAB.id, DEFAULT_TAB.title, 0, panels, 0, yShift);
 
   return { schema: 'v1', tabs: [DEFAULT_TAB], panels };
 }
@@ -53,7 +57,8 @@ function walkV1PanelList(
   tabTitle: string,
   yOffset: number,
   out: ExtractedPanel[],
-  flowStart: number
+  flowStart: number,
+  yShift: { value: number }
 ): number {
   let flowOrder = flowStart;
   for (const item of panelList) {
@@ -65,16 +70,41 @@ function walkV1PanelList(
       const nested = panel.panels;
       const rowY = gridPosFromUnknown(panel.gridPos)?.y ?? 0;
       if (Array.isArray(nested)) {
-        flowOrder = walkV1PanelList(nested, tabId, tabTitle, yOffset + rowY, out, flowOrder);
+        flowOrder = walkV1PanelList(nested, tabId, tabTitle, yOffset + rowY, out, flowOrder, yShift);
+        if (panel.collapsed === true) {
+          yShift.value += collapsedRowPushDown(panel, nested);
+        }
       }
       continue;
     }
 
     const extracted = panelFromV1(panel, tabId, tabTitle);
+    if (extracted.gridPos && yShift.value !== 0) {
+      extracted.gridPos = { ...extracted.gridPos, y: extracted.gridPos.y + yShift.value };
+    }
     extracted.flowOrder = flowOrder++;
     out.push(extracted);
   }
   return flowOrder;
+}
+
+function collapsedRowPushDown(row: UnknownRecord, rowPanels: unknown[]): number {
+  if (rowPanels.length === 0) {
+    return 0;
+  }
+
+  const rowY = gridPosFromUnknown(row.gridPos)?.y ?? 0;
+  let yMax = rowY + 1;
+  for (const child of rowPanels) {
+    if (!child || typeof child !== 'object') {
+      continue;
+    }
+    const pos = gridPosFromUnknown((child as UnknownRecord).gridPos);
+    if (pos) {
+      yMax = Math.max(yMax, pos.y + pos.h);
+    }
+  }
+  return Math.max(0, yMax - rowY - 1);
 }
 
 function panelFromV1(panel: UnknownRecord, tabId: string, tabTitle: string): ExtractedPanel {
@@ -240,6 +270,7 @@ function walkTabsLayout(
   if (!Array.isArray(tabs)) {
     return;
   }
+  const usedIds = new Set<string>();
   tabs.forEach((tab, index) => {
     if (!tab || typeof tab !== 'object') {
       return;
@@ -250,7 +281,7 @@ function walkTabsLayout(
     }
     const tabSpec = tabRecord.spec as UnknownRecord;
     const title = typeof tabSpec.title === 'string' && tabSpec.title ? tabSpec.title : `Tab ${index + 1}`;
-    const tabId = `tab-${index}-${slugify(title)}`;
+    const tabId = tabIdentity(tabRecord, title, usedIds);
     tabsMap.set(tabId, { id: tabId, title });
     const nestedLayout = tabSpec.layout as UnknownRecord;
     if (nestedLayout) {
@@ -289,8 +320,10 @@ function walkRowsLayout(
       walkV2Layout(nestedLayout, elements, tabId, tabTitle, cumulativeY, out, tabsMap, nextFlowOrder);
     }
     const rowPanels = out.slice(beforeCount);
-    const rowHeight = maxGridBottom(rowPanels);
-    cumulativeY += rowHeight > 0 ? rowHeight : 1;
+    // Nested grid positions already include cumulativeY. Use the absolute
+    // bottom as the next row's offset instead of adding that bottom again.
+    const rowBottom = maxGridBottom(rowPanels);
+    cumulativeY = rowBottom > cumulativeY ? rowBottom : cumulativeY + 1;
   }
 }
 
@@ -364,12 +397,7 @@ function gridPosFromUnknown(gridPos: unknown): GridPos | undefined {
     return undefined;
   }
   const gp = gridPos as UnknownRecord;
-  if (
-    typeof gp.x === 'number' &&
-    typeof gp.y === 'number' &&
-    typeof gp.w === 'number' &&
-    typeof gp.h === 'number'
-  ) {
+  if (typeof gp.x === 'number' && typeof gp.y === 'number' && typeof gp.w === 'number' && typeof gp.h === 'number') {
     return { x: gp.x, y: gp.y, w: gp.w, h: gp.h };
   }
   return undefined;
@@ -491,6 +519,130 @@ function slugify(value: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+}
+
+function tabIdentity(tabRecord: UnknownRecord, title: string, usedIds: Set<string>): string {
+  const metadata = tabRecord.metadata;
+  if (metadata && typeof metadata === 'object') {
+    const name = (metadata as UnknownRecord).name;
+    if (typeof name === 'string' && name) {
+      usedIds.add(name);
+      return name;
+    }
+  }
+
+  const base = `tab-${slugify(title) || 'untitled'}`;
+  if (!usedIds.has(base)) {
+    usedIds.add(base);
+    return base;
+  }
+
+  let suffix = 2;
+  let candidate = `${base}__${suffix}`;
+  while (usedIds.has(candidate)) {
+    suffix += 1;
+    candidate = `${base}__${suffix}`;
+  }
+  usedIds.add(candidate);
+  return candidate;
+}
+
+function panelKeysByTab(panels: ExtractedPanel[]): Map<string, Set<string>> {
+  const keys = new Map<string, Set<string>>();
+  for (const panel of panels) {
+    let set = keys.get(panel.tabId);
+    if (!set) {
+      set = new Set<string>();
+      keys.set(panel.tabId, set);
+    }
+    set.add(panel.matchKey);
+  }
+  return keys;
+}
+
+/**
+ * Rewrite new-version tab ids to the matching base tab so reorder/rename do not
+ * look like every panel moved. Match by panel overlap first, then by title.
+ */
+export function alignTabDescriptors(base: ExtractPanelsResult, next: ExtractPanelsResult): void {
+  if (base.tabs.length === 0 || next.tabs.length === 0) {
+    return;
+  }
+
+  const remapNewToBase = new Map<string, string>();
+  const usedNew = new Set<string>();
+  const usedBase = new Set<string>();
+  const baseKeys = panelKeysByTab(base.panels);
+  const nextKeys = panelKeysByTab(next.panels);
+
+  for (const baseTab of base.tabs) {
+    if (next.tabs.some((tab) => tab.id === baseTab.id)) {
+      usedBase.add(baseTab.id);
+      usedNew.add(baseTab.id);
+    }
+  }
+
+  for (const baseTab of base.tabs) {
+    if (usedBase.has(baseTab.id)) {
+      continue;
+    }
+    const bKeys = baseKeys.get(baseTab.id) ?? new Set<string>();
+    let bestId: string | undefined;
+    let bestScore = 0;
+    for (const nextTab of next.tabs) {
+      if (usedNew.has(nextTab.id)) {
+        continue;
+      }
+      const nKeys = nextKeys.get(nextTab.id) ?? new Set<string>();
+      let overlap = 0;
+      for (const key of bKeys) {
+        if (nKeys.has(key)) {
+          overlap += 1;
+        }
+      }
+      if (overlap > bestScore) {
+        bestScore = overlap;
+        bestId = nextTab.id;
+      }
+    }
+    if (bestId && bestScore > 0) {
+      remapNewToBase.set(bestId, baseTab.id);
+      usedNew.add(bestId);
+      usedBase.add(baseTab.id);
+    }
+  }
+
+  for (const baseTab of base.tabs) {
+    if (usedBase.has(baseTab.id)) {
+      continue;
+    }
+    const match = next.tabs.find((tab) => !usedNew.has(tab.id) && tab.title === baseTab.title);
+    if (match) {
+      remapNewToBase.set(match.id, baseTab.id);
+      usedNew.add(match.id);
+      usedBase.add(baseTab.id);
+    }
+  }
+
+  if (remapNewToBase.size === 0) {
+    return;
+  }
+
+  const newTitleByCanonical = new Map<string, string>();
+  for (const tab of next.tabs) {
+    const canonical = remapNewToBase.get(tab.id) ?? tab.id;
+    newTitleByCanonical.set(canonical, tab.title);
+    tab.id = canonical;
+  }
+  for (const panel of next.panels) {
+    panel.tabId = remapNewToBase.get(panel.tabId) ?? panel.tabId;
+  }
+  for (const tab of base.tabs) {
+    const newTitle = newTitleByCanonical.get(tab.id);
+    if (newTitle) {
+      tab.title = newTitle;
+    }
+  }
 }
 
 export function mergeTabDescriptors(...tabLists: TabDescriptor[][]): TabDescriptor[] {

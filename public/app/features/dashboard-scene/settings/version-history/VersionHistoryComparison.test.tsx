@@ -75,4 +75,45 @@ describe('VersionHistoryComparison', () => {
     expect(screen.getByText(/Old title → New title/)).toBeInTheDocument();
     expect(screen.getByText(/old_query → new_query/)).toBeInTheDocument();
   });
+
+  it('shows Changed and Moved when a panel is relocated and its content changes', () => {
+    const lhs = {
+      schemaVersion: 39,
+      panels: [
+        {
+          id: 1,
+          title: 'Old title',
+          type: 'timeseries',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+          targets: [{ refId: 'A', expr: 'a' }],
+        },
+      ],
+    };
+    const rhs = {
+      schemaVersion: 39,
+      panels: [
+        {
+          id: 1,
+          title: 'New title',
+          type: 'timeseries',
+          gridPos: { x: 12, y: 0, w: 12, h: 8 },
+          targets: [{ refId: 'A', expr: 'a' }],
+        },
+      ],
+    };
+
+    render(
+      <VersionHistoryComparison
+        baseInfo={{ ...baseInfo, data: lhs }}
+        newInfo={{ ...newInfo, data: rhs }}
+        diffData={{ lhs, rhs }}
+        isNewLatest={true}
+        onRestore={async () => true}
+      />
+    );
+
+    const panel = screen.getByTestId('visual-diff-panel-1');
+    expect(panel).toHaveTextContent('Changed');
+    expect(panel).toHaveTextContent('Moved');
+  });
 });
