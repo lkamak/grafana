@@ -80,7 +80,11 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
         data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffCanvas}
       >
         {activeTab.panels.map((entry) => {
-          const ghostPos = entry.status === 'moved' || entry.status === 'changed' ? entry.base?.gridPos : undefined;
+          const movedPosition = entry.fieldChanges.some((change) => change.field === 'position');
+          const ghostPos =
+            (entry.status === 'moved' || (entry.status === 'changed' && movedPosition)) && entry.base?.gridPos
+              ? entry.base.gridPos
+              : undefined;
           if (ghostPos) {
             return <PanelGhostTile key={`ghost-${entry.id}`} gridPos={ghostPos} styles={styles} />;
           }
