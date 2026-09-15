@@ -550,6 +550,138 @@ describe('computeVisualPanelVersionDiff', () => {
     expect(result.tabs[1].panels.map((p) => p.id)).toEqual([2]);
   });
 
+  it('does not include inner row titles in a tab title path', () => {
+    const makeDashboard = () => ({
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            {
+              kind: 'RowsLayoutRow',
+              spec: {
+                title: 'Row A',
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        kind: 'TabsLayoutTab',
+                        spec: {
+                          title: 'CPU',
+                          layout: {
+                            kind: 'RowsLayout',
+                            spec: {
+                              rows: [
+                                {
+                                  kind: 'RowsLayoutRow',
+                                  spec: {
+                                    title: 'Metrics',
+                                    layout: {
+                                      kind: 'GridLayout',
+                                      spec: {
+                                        items: [
+                                          {
+                                            kind: 'GridLayoutItem',
+                                            spec: {
+                                              x: 0,
+                                              y: 0,
+                                              width: 12,
+                                              height: 8,
+                                              element: { kind: 'ElementReference', name: 'p1' },
+                                            },
+                                          },
+                                        ],
+                                      },
+                                    },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              kind: 'RowsLayoutRow',
+              spec: {
+                title: 'Row B',
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        kind: 'TabsLayoutTab',
+                        spec: {
+                          title: 'CPU',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [
+                                {
+                                  kind: 'GridLayoutItem',
+                                  spec: {
+                                    x: 0,
+                                    y: 0,
+                                    width: 12,
+                                    height: 8,
+                                    element: { kind: 'ElementReference', name: 'p2' },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      elements: {
+        p1: {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Row A CPU',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+        p2: {
+          kind: 'Panel',
+          spec: {
+            id: 2,
+            title: 'Row B CPU',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+      },
+    });
+
+    const result = computeVisualPanelVersionDiff(makeDashboard(), makeDashboard());
+    expect(result.tabs).toHaveLength(2);
+    expect(result.tabs[0].titlePath).toEqual(['Row A', 'CPU']);
+    expect(result.tabs[1].titlePath).toEqual(['Row B', 'CPU']);
+  });
+
   it('keeps panels matched when a tab is renamed', () => {
     const makeDashboard = (tabTitle: string) => ({
       layout: {

@@ -254,7 +254,14 @@ function gridLayoutExtent(items: JsonObject[]): number {
 function walkV2Layout(
   layout: JsonObject,
   elements: JsonObject,
-  ctx: { yOffset: number; tabId: string; tabTitle: string; layoutPath: string; titlePath: string[] },
+  ctx: {
+    yOffset: number;
+    tabId: string;
+    tabTitle: string;
+    layoutPath: string;
+    titlePath: string[];
+    tabTitlePath: string[];
+  },
   out: NormalizedPanel[]
 ): number {
   const kind = layout.kind as string | undefined;
@@ -289,7 +296,7 @@ function walkV2Layout(
         undefined,
         ctx.tabId,
         ctx.tabTitle,
-        ctx.titlePath
+        ctx.tabTitlePath
       );
       if (normalized) {
         out.push(normalized);
@@ -318,7 +325,7 @@ function walkV2Layout(
         index,
         ctx.tabId,
         ctx.tabTitle,
-        ctx.titlePath
+        ctx.tabTitlePath
       );
       if (normalized) {
         out.push(normalized);
@@ -337,7 +344,12 @@ function walkV2Layout(
       const titlePath = tabTitle ? [...ctx.titlePath, tabTitle] : ctx.titlePath;
       const innerLayout = tabSpec?.layout as JsonObject | undefined;
       if (innerLayout) {
-        walkV2Layout(innerLayout, elements, { yOffset: 0, tabId, tabTitle, layoutPath: tabId, titlePath }, out);
+        walkV2Layout(
+          innerLayout,
+          elements,
+          { yOffset: 0, tabId, tabTitle, layoutPath: tabId, titlePath, tabTitlePath: titlePath },
+          out
+        );
       }
     }
     return 0;
@@ -378,12 +390,24 @@ function extractV2Panels(data: object): Map<string, ExtractedTabPanels> {
 
   const rootKind = layout.kind as string | undefined;
   if (rootKind === 'TabsLayout') {
-    walkV2Layout(layout, elements, { yOffset: 0, tabId: '', tabTitle: '', layoutPath: '', titlePath: [] }, normalized);
+    walkV2Layout(
+      layout,
+      elements,
+      { yOffset: 0, tabId: '', tabTitle: '', layoutPath: '', titlePath: [], tabTitlePath: [] },
+      normalized
+    );
   } else {
     walkV2Layout(
       layout,
       elements,
-      { yOffset: 0, tabId: DEFAULT_TAB_ID, tabTitle: DEFAULT_TAB_TITLE, layoutPath: '', titlePath: [] },
+      {
+        yOffset: 0,
+        tabId: DEFAULT_TAB_ID,
+        tabTitle: DEFAULT_TAB_TITLE,
+        layoutPath: '',
+        titlePath: [],
+        tabTitlePath: [],
+      },
       normalized
     );
   }
