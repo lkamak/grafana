@@ -78,8 +78,10 @@ import { changePanelState } from '../state/explorePane';
 import { changeQueries, runQueries } from '../state/query';
 
 import { ExploreLogsTable } from './ExploreLogsTable';
+import { LogPatternChips } from './LogPatternChips';
 import { LogsFeedback } from './LogsFeedback';
 import { LogsMetaRow } from './LogsMetaRow';
+import { rowMatchesPattern } from './logPatternChips';
 import { getLogsTableHeight } from './LogsTableWrap';
 import { LogsVolumePanelList } from './LogsVolumePanelList';
 import { type LogsVisualisationType } from './constants';
@@ -222,6 +224,7 @@ const UnthemedLogs: React.FunctionComponent<Props> = (props: Props) => {
   const { register, unregister, outlineItems, updateItem } = useContentOutlineContext() ?? {};
   const toggleLegendRef = useRef<(name: string | undefined, mode: SeriesVisibilityChangeMode) => void>(() => {});
   const [filterLevels, setFilterLevels] = useState<LogLevel[] | undefined>(undefined);
+  const [selectedLogPattern, setSelectedLogPattern] = useState<string | undefined>(undefined);
   const enableNewLogsTable = useFlagLogsTablePanelNG();
 
   const tableHeight = getLogsTableHeight();
@@ -641,7 +644,21 @@ const UnthemedLogs: React.FunctionComponent<Props> = (props: Props) => {
     [getPinnedLogsCount, onOpenContext, onPinLineCallback, outlineItems, pinnedLogs, register, unregister, updateItem]
   );
 
-  const { dedupedRows, dedupCount } = useMemo(() => dedupRows(logRows, dedupStrategy), [dedupStrategy, logRows]);
+  const patternedLogRows = useMemo(
+    () => (selectedLogPattern ? logRows.filter((row) => rowMatchesPattern(row, selectedLogPattern)) : logRows),
+    [logRows, selectedLogPattern]
+  );
+
+  useEffect(() => {
+    if (selectedLogPattern && !logRows.some((row) => rowMatchesPattern(row, selectedLogPattern))) {
+      setSelectedLogPattern(undefined);
+    }
+  }, [logRows, selectedLogPattern]);
+
+  const { dedupedRows, dedupCount } = useMemo(
+    () => dedupRows(patternedLogRows, dedupStrategy),
+    [dedupStrategy, patternedLogRows]
+  );
 
   const infiniteScrollAvailable = useMemo(
     () => !logsQueries?.some((query) => 'direction' in query && query.direction === LokiQueryDirection.Scan),
@@ -873,6 +890,13 @@ const UnthemedLogs: React.FunctionComponent<Props> = (props: Props) => {
             defaultDisplayedFields={defaultDisplayedFields}
             visualisationType={visualisationType}
           />
+          {hasData && (
+            <LogPatternChips
+              logRows={logRows}
+              selectedPattern={selectedLogPattern}
+              onSelectPattern={setSelectedLogPattern}
+            />
+          )}
         </div>
         <div className={cx(styles.logsSection, visualisationType === 'table' ? styles.logsTable : undefined)}>
           {enableNewLogsTable && visualisationType === 'table' && hasData && (
@@ -903,7 +927,7 @@ const UnthemedLogs: React.FunctionComponent<Props> = (props: Props) => {
                 exploreId={props.exploreId}
                 filterLevels={filterLevels}
                 logOptionsStorageKey={SETTING_KEY_ROOT}
-                logRows={logRows}
+                logRows={patternedLogRows}
                 logsMeta={logsMeta}
                 logsSortOrder={logsSortOrder}
                 logsTableFrames={props.logsFrames}

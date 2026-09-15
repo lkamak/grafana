@@ -204,6 +204,31 @@ describe('Logs', () => {
     expect(screen.getByText('log message 1')).toBeInTheDocument();
   });
 
+  it('shows log pattern chips and filters the visible stream', async () => {
+    const logs = [
+      makeLog({ uid: '1', entry: 'error connecting to db', raw: 'error connecting to db', timeEpochMs: 1 }),
+      makeLog({ uid: '2', entry: 'error connecting to db', raw: 'error connecting to db', timeEpochMs: 2 }),
+      makeLog({ uid: '3', entry: 'user login succeeded', raw: 'user login succeeded', timeEpochMs: 3 }),
+    ];
+    setup({}, undefined, logs);
+
+    const errorChip = await screen.findByRole('button', { name: 'error connecting to db (2)' });
+    expect(errorChip).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'user login succeeded (1)' })).toBeInTheDocument();
+    expect(await screen.findByText('user login succeeded')).toBeInTheDocument();
+
+    await userEvent.click(errorChip);
+
+    expect(errorChip).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Clear pattern' })).toBeInTheDocument();
+    expect(screen.queryByText('user login succeeded')).not.toBeInTheDocument();
+    expect(screen.getAllByText('error connecting to db').length).toBeGreaterThan(0);
+
+    await userEvent.click(screen.getByRole('button', { name: 'Clear pattern' }));
+    expect(await screen.findByText('user login succeeded')).toBeInTheDocument();
+    expect(errorChip).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('should render no logs found', () => {
     setup({}, undefined, []);
 
@@ -493,7 +518,7 @@ describe('Logs', () => {
       setup({ loading: false, panelState, logRows: rows });
 
       expect(await screen.findByText(/field value/)).toBeInTheDocument();
-      expect(screen.queryByText(/log message/)).not.toBeInTheDocument();
+      expect(screen.queryByText('log message 1')).not.toBeInTheDocument();
     });
   });
 
