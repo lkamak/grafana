@@ -9,7 +9,7 @@ export type GridPos = {
   h: number;
 };
 
-export type PanelFieldName = 'title' | 'query' | 'vizType' | 'thresholds' | 'position';
+export type PanelFieldName = 'title' | 'query' | 'vizType' | 'thresholds' | 'position' | 'libraryPanel';
 
 export type PanelFieldChange = {
   field: PanelFieldName;
@@ -23,6 +23,7 @@ export type NormalizedPanel = {
   vizType: string;
   queries: string;
   thresholds: string;
+  libraryPanelUid: string;
   gridPos?: GridPos;
   autoGridIndex?: number;
   tabId: string;
@@ -59,12 +60,23 @@ function isV2Dashboard(data: object): boolean {
   return Boolean(d.layout && typeof d.layout === 'object' && d.elements && typeof d.elements === 'object');
 }
 
-function tabKeyFromTitle(title: string, index: number): string {
-  const trimmed = title.trim();
-  if (trimmed) {
-    return trimmed;
+function childLayoutPath(layoutPath: string, segment: string): string {
+  return layoutPath ? `${layoutPath}/${segment}` : segment;
+}
+
+function libraryPanelUidFrom(value: unknown): string {
+  if (!value || typeof value !== 'object') {
+    return '';
   }
-  return `tab-${index}`;
+  const uid = (value as JsonObject).uid;
+  if (uid === undefined || uid === null) {
+    return '';
+  }
+  return String(uid);
+}
+
+function isVisualDiffElement(element: JsonObject | undefined): element is JsonObject {
+  return element?.kind === 'Panel' || element?.kind === 'LibraryPanel';
 }
 
 function serializeThresholds(thresholds: unknown): string {
@@ -109,9 +121,8 @@ function normalizeV1Panel(panel: JsonObject, tabId: string, tabTitle: string): N
     vizType: String(panel.type ?? ''),
     queries: serializeV1Queries(panel.targets),
     thresholds: serializeThresholds(defaults?.thresholds),
-    gridPos: gridPos
-      ? { x: gridPos.x ?? 0, y: gridPos.y ?? 0, w: gridPos.w ?? 12, h: gridPos.h ?? 8 }
-      : undefined,
+    libraryPanelUid: libraryPanelUidFrom(panel.libraryPanel),
+    gridPos: gridPos ? { x: gridPos.x ?? 0, y: gridPos.y ?? 0, w: gridPos.w ?? 12, h: gridPos.h ?? 8 } : undefined,
     tabId,
     tabTitle,
   };
@@ -128,10 +139,9 @@ function walkV1Panels(panels: unknown[], tabId: string, tabTitle: string, out: N
     }
     const panel = raw as JsonObject;
     if (panel.type === 'row') {
-      const nested = panel.panels;
-      const collapsed = panel.collapsed === true;
-      if (Array.isArray(nested) && !collapsed) {
-        walkV1Panels(nested, tabId, tabTitle, out);
+      // Collapsed v1 rows store children in row.panels; expanded rows keep them as siblings.
+      if (panel.collapsed === true && Array.isArray(panel.panels)) {
+        walkV1Panels(panel.panels, tabId, tabTitle, out);
       }
       continue;
     }
@@ -213,6 +223,7 @@ function normalizeV2Panel(
     vizType: String(vizConfig?.group ?? ''),
     queries: queriesSerialized,
     thresholds: serializeThresholds(defaults?.thresholds),
+    libraryPanelUid: libraryPanelUidFrom(spec.libraryPanel),
     gridPos,
     autoGridIndex,
     tabId,
@@ -237,7 +248,7 @@ function gridLayoutExtent(items: JsonObject[]): number {
 function walkV2Layout(
   layout: JsonObject,
   elements: JsonObject,
-  ctx: { yOffset: number; tabId: string; tabTitle: string },
+  ctx: { yOffset: number; tabId: string; tabTitle: string; layoutPath: string },
   out: NormalizedPanel[]
 ): number {
   const kind = layout.kind as string | undefined;
@@ -256,7 +267,7 @@ function walkV2Layout(
         continue;
       }
       const element = elements[elementName] as JsonObject | undefined;
-      if (!element || element.kind !== 'Panel') {
+      if (!isVisualDiffElement(element)) {
         continue;
       }
       const gridPos: GridPos = {
@@ -283,7 +294,7 @@ function walkV2Layout(
         return;
       }
       const element = elements[elementName] as JsonObject | undefined;
-      if (!element || element.kind !== 'Panel') {
+      if (!isVisualDiffElement(element)) {
         return;
       }
       const normalized = normalizeV2Panel(element, elementName, undefined, index, ctx.tabId, ctx.tabTitle);
@@ -299,10 +310,11 @@ function walkV2Layout(
     for (const [index, tab] of tabs.entries()) {
       const tabSpec = tab.spec as JsonObject | undefined;
       const tabTitle = String(tabSpec?.title ?? '');
-      const tabId = tabKeyFromTitle(tabTitle, index);
+      // Path keys keep duplicate titles, nested tabs, and sibling tab groups distinct.
+      const tabId = childLayoutPath(ctx.layoutPath, `tab-${index}`);
       const innerLayout = tabSpec?.layout as JsonObject | undefined;
       if (innerLayout) {
-        walkV2Layout(innerLayout, elements, { yOffset: 0, tabId, tabTitle }, out);
+        walkV2Layout(innerLayout, elements, { yOffset: 0, tabId, tabTitle, layoutPath: tabId }, out);
       }
     }
     return 0;
@@ -312,16 +324,18 @@ function walkV2Layout(
     const rows = (spec.rows as JsonObject[]) ?? [];
     let yOffset = ctx.yOffset;
     let totalHeight = 0;
-    for (const row of rows) {
+    for (const [rowIndex, row] of rows.entries()) {
       const rowSpec = row.spec as JsonObject | undefined;
-      if (rowSpec?.collapse === true) {
-        continue;
-      }
       const innerLayout = rowSpec?.layout as JsonObject | undefined;
       if (!innerLayout) {
         continue;
       }
-      const rowHeight = walkV2Layout(innerLayout, elements, { ...ctx, yOffset }, out);
+      const rowHeight = walkV2Layout(
+        innerLayout,
+        elements,
+        { ...ctx, yOffset, layoutPath: childLayoutPath(ctx.layoutPath, `row-${rowIndex}`) },
+        out
+      );
       yOffset += rowHeight;
       totalHeight += rowHeight;
     }
@@ -339,9 +353,14 @@ function extractV2Panels(data: object): Map<string, ExtractedTabPanels> {
 
   const rootKind = layout.kind as string | undefined;
   if (rootKind === 'TabsLayout') {
-    walkV2Layout(layout, elements, { yOffset: 0, tabId: '', tabTitle: '' }, normalized);
+    walkV2Layout(layout, elements, { yOffset: 0, tabId: '', tabTitle: '', layoutPath: '' }, normalized);
   } else {
-    walkV2Layout(layout, elements, { yOffset: 0, tabId: DEFAULT_TAB_ID, tabTitle: DEFAULT_TAB_TITLE }, normalized);
+    walkV2Layout(
+      layout,
+      elements,
+      { yOffset: 0, tabId: DEFAULT_TAB_ID, tabTitle: DEFAULT_TAB_TITLE, layoutPath: '' },
+      normalized
+    );
   }
 
   return panelsToTabMap(normalized);
@@ -380,7 +399,8 @@ function fieldsEqual(a: NormalizedPanel, b: NormalizedPanel): boolean {
     a.title === b.title &&
     a.queries === b.queries &&
     a.vizType === b.vizType &&
-    a.thresholds === b.thresholds
+    a.thresholds === b.thresholds &&
+    a.libraryPanelUid === b.libraryPanelUid
   );
 }
 
@@ -411,6 +431,13 @@ function buildFieldChanges(base: NormalizedPanel, current: NormalizedPanel): Pan
   }
   if (base.thresholds !== current.thresholds) {
     changes.push({ field: 'thresholds', before: base.thresholds || '—', after: current.thresholds || '—' });
+  }
+  if (base.libraryPanelUid !== current.libraryPanelUid) {
+    changes.push({
+      field: 'libraryPanel',
+      before: base.libraryPanelUid || '—',
+      after: current.libraryPanelUid || '—',
+    });
   }
   if (!positionEqual(base, current)) {
     changes.push({

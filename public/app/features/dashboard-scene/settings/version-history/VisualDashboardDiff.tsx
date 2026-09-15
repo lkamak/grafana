@@ -3,15 +3,7 @@ import { useMemo, useState } from 'react';
 
 import { type GrafanaTheme2 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
-import {
-  Badge,
-  Drawer,
-  Icon,
-  RadioButtonGroup,
-  Stack,
-  Text,
-  useStyles2,
-} from '@grafana/ui';
+import { Badge, Drawer, Icon, RadioButtonGroup, Stack, Text, useStyles2 } from '@grafana/ui';
 import { selectors } from '@grafana/e2e-selectors';
 
 import {
@@ -52,6 +44,8 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
     );
   }
 
+  const { stacks, flowing } = groupGridTiles(activeTab.panels);
+
   return (
     <Stack direction="column" gap={2}>
       <Stack alignItems="center" justifyContent="space-between" wrap="wrap">
@@ -75,10 +69,7 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
         />
       )}
 
-      <div
-        className={styles.canvas}
-        data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffCanvas}
-      >
+      <div className={styles.canvas} data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffCanvas}>
         {activeTab.panels.map((entry) => {
           const movedPosition = entry.fieldChanges.some((change) => change.field === 'position');
           const ghostPos =
@@ -90,7 +81,40 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
           }
           return null;
         })}
-        {activeTab.panels.map((entry) => (
+        {stacks.map(({ gridPos, entries }) => {
+          if (entries.length === 1) {
+            return (
+              <PanelDiffTile
+                key={String(entries[0].id)}
+                entry={entries[0]}
+                styles={styles}
+                onSelect={() => setSelectedPanel(entries[0])}
+              />
+            );
+          }
+
+          return (
+            <div
+              key={`stack-${gridPos.x}-${gridPos.y}-${gridPos.w}-${gridPos.h}`}
+              className={styles.tileStack}
+              style={{
+                gridColumn: `${gridPos.x + 1} / span ${gridPos.w}`,
+                gridRow: `${gridPos.y + 1} / span ${gridPos.h}`,
+              }}
+            >
+              {entries.map((entry) => (
+                <PanelDiffTile
+                  key={String(entry.id)}
+                  entry={entry}
+                  styles={styles}
+                  stacked
+                  onSelect={() => setSelectedPanel(entry)}
+                />
+              ))}
+            </div>
+          );
+        })}
+        {flowing.map((entry) => (
           <PanelDiffTile
             key={String(entry.id)}
             entry={entry}
@@ -100,9 +124,7 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
         ))}
       </div>
 
-      {selectedPanel && (
-        <PanelDetailDrawer entry={selectedPanel} onClose={() => setSelectedPanel(null)} />
-      )}
+      {selectedPanel && <PanelDetailDrawer entry={selectedPanel} onClose={() => setSelectedPanel(null)} />}
     </Stack>
   );
 }
@@ -132,13 +154,34 @@ function statusLabel(status: PanelDiffStatus): string {
   }
 }
 
-function PanelGhostTile({
-  gridPos,
-  styles,
-}: {
-  gridPos: GridPos;
-  styles: ReturnType<typeof getStyles>;
-}) {
+function gridPosKey(pos: GridPos): string {
+  return `${pos.x}:${pos.y}:${pos.w}:${pos.h}`;
+}
+
+function groupGridTiles(panels: PanelDiffEntry[]) {
+  const stacks = new Map<string, { gridPos: GridPos; entries: PanelDiffEntry[] }>();
+  const flowing: PanelDiffEntry[] = [];
+
+  for (const entry of panels) {
+    const panel = entry.current ?? entry.base;
+    const gridPos = entry.current?.gridPos ?? entry.base?.gridPos;
+    if (panel?.autoGridIndex !== undefined || !gridPos) {
+      flowing.push(entry);
+      continue;
+    }
+    const key = gridPosKey(gridPos);
+    const stack = stacks.get(key);
+    if (stack) {
+      stack.entries.push(entry);
+    } else {
+      stacks.set(key, { gridPos, entries: [entry] });
+    }
+  }
+
+  return { stacks: [...stacks.values()], flowing };
+}
+
+function PanelGhostTile({ gridPos, styles }: { gridPos: GridPos; styles: ReturnType<typeof getStyles> }) {
   return (
     <div
       className={styles.ghostTile}
@@ -155,33 +198,22 @@ function PanelDiffTile({
   entry,
   styles,
   onSelect,
+  stacked,
 }: {
   entry: PanelDiffEntry;
   styles: ReturnType<typeof getStyles>;
   onSelect: () => void;
+  stacked?: boolean;
 }) {
   const panel = entry.current ?? entry.base;
   const autoIndex = panel?.autoGridIndex;
-
-  if (autoIndex !== undefined) {
-    return (
-      <button
-        type="button"
-        className={styles.autoTile(entry.status)}
-        onClick={onSelect}
-        data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(String(entry.id))}
-      >
-        <PanelTileContent entry={entry} />
-      </button>
-    );
-  }
-
   const gridPos = entry.current?.gridPos ?? entry.base?.gridPos;
-  if (!gridPos) {
+
+  if (stacked || autoIndex !== undefined || !gridPos) {
     return (
       <button
         type="button"
-        className={styles.autoTile(entry.status)}
+        className={stacked ? styles.stackedTile(entry.status) : styles.autoTile(entry.status)}
         onClick={onSelect}
         data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(String(entry.id))}
       >
@@ -244,12 +276,7 @@ function PanelDetailDrawer({ entry, onClose }: { entry: PanelDiffEntry; onClose:
   const title = entry.title || t('dashboard-scene.version-history-visual.untitled-panel', 'Untitled panel');
 
   return (
-    <Drawer
-      title={title}
-      subtitle={statusLabel(entry.status)}
-      onClose={onClose}
-      size="md"
-    >
+    <Drawer title={title} subtitle={statusLabel(entry.status)} onClose={onClose} size="md">
       {entry.fieldChanges.length === 0 ? (
         <Text color="secondary">
           <Trans i18nKey="dashboard-scene.version-history-visual.no-field-changes">
@@ -295,6 +322,8 @@ function fieldLabelFor(field: PanelFieldChange['field']): string {
       return t('dashboard-scene.version-history-visual.field-thresholds', 'Thresholds');
     case 'position':
       return t('dashboard-scene.version-history-visual.field-position', 'Position');
+    case 'libraryPanel':
+      return t('dashboard-scene.version-history-visual.field-library-panel', 'Library panel');
     default:
       return field;
   }
@@ -328,11 +357,34 @@ const getStyles = (theme: GrafanaTheme2) => {
       borderRadius: theme.shape.radius.default,
       border: `1px solid ${theme.colors.border.weak}`,
     }),
+    tileStack: css({
+      display: 'flex',
+      flexDirection: 'column',
+      gap: theme.spacing(0.5),
+      minHeight: theme.spacing(6),
+    }),
     tile: (status: PanelDiffStatus) =>
       css({
         display: 'block',
         width: '100%',
         height: '100%',
+        minHeight: theme.spacing(6),
+        padding: theme.spacing(1),
+        textAlign: 'left',
+        cursor: 'pointer',
+        background: theme.colors.background.primary,
+        border: `2px solid ${statusBorder(status)}`,
+        borderRadius: theme.shape.radius.default,
+        color: theme.colors.text.primary,
+        '&:hover': {
+          background: theme.colors.action.hover,
+        },
+      }),
+    stackedTile: (status: PanelDiffStatus) =>
+      css({
+        display: 'block',
+        width: '100%',
+        flex: 1,
         minHeight: theme.spacing(6),
         padding: theme.spacing(1),
         textAlign: 'left',

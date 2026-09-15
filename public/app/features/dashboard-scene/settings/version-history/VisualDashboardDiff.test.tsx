@@ -42,9 +42,7 @@ describe('VisualDashboardDiff', () => {
 
     renderDiff(base, current);
 
-    const panelTile = await screen.findByTestId(
-      selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(1)
-    );
+    const panelTile = await screen.findByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(1));
     await user.click(panelTile);
 
     const drawer = await screen.findByRole('dialog', { name: /CPU usage/i });
@@ -162,5 +160,45 @@ describe('VisualDashboardDiff', () => {
     expect(
       screen.queryByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(10))
     ).not.toBeInTheDocument();
+  });
+
+  it('keeps replaced panels at the same grid cell independently clickable', async () => {
+    const user = userEvent.setup();
+    const base = {
+      panels: [
+        {
+          id: 1,
+          type: 'timeseries',
+          title: 'Old panel',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+        },
+      ],
+    };
+    const current = {
+      panels: [
+        {
+          id: 2,
+          type: 'stat',
+          title: 'New panel',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+        },
+      ],
+    };
+
+    renderDiff(base, current);
+
+    const removed = await screen.findByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(1));
+    const added = screen.getByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(2));
+    const canvas = screen.getByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffCanvas);
+
+    expect(removed.parentElement).toBe(added.parentElement);
+    expect(removed.parentElement).not.toBe(canvas);
+
+    await user.click(removed);
+    expect(await screen.findByRole('dialog', { name: /Old panel/i })).toBeInTheDocument();
+
+    await user.click(screen.getByTestId(selectors.components.Drawer.General.close));
+    await user.click(added);
+    expect(await screen.findByRole('dialog', { name: /New panel/i })).toBeInTheDocument();
   });
 });
