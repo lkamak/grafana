@@ -8,6 +8,7 @@ import { type DecoratedRevisionModel } from 'app/features/dashboard/types/revisi
 import { DiffGroup } from './DiffGroup';
 import LazyDiffViewer from './LazyDiffViewer';
 import { RevertDashboardModal } from './RevertDashboardModal';
+import { VisualDashboardDiff } from './VisualDashboardDiff';
 import { jsonDiff } from './utils';
 
 type DiffViewProps = {
@@ -71,6 +72,8 @@ export const VersionHistoryComparison = ({ baseInfo, newInfo, diffData, isNewLat
           </ModalsController>
         )}
       </Stack>
+
+      <VisualDashboardDiff baseData={diffData.lhs} newData={diffData.rhs} />
 
       {Object.entries(diff).map(([key, diffs]) => (
         <DiffGroup diffs={diffs} key={key} title={key} />
