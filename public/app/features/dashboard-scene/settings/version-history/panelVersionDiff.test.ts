@@ -543,6 +543,8 @@ describe('computeVisualPanelVersionDiff', () => {
     expect(result.tabs).toHaveLength(2);
     expect(result.tabs[0].tabTitle).toBe('CPU');
     expect(result.tabs[1].tabTitle).toBe('CPU');
+    expect(result.tabs[0].titlePath).toEqual(['Row A', 'CPU']);
+    expect(result.tabs[1].titlePath).toEqual(['Row B', 'CPU']);
     expect(result.tabs[0].tabId).not.toBe(result.tabs[1].tabId);
     expect(result.tabs[0].panels.map((p) => p.id)).toEqual([1]);
     expect(result.tabs[1].panels.map((p) => p.id)).toEqual([2]);

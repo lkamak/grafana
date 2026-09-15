@@ -13,6 +13,7 @@ import {
   type PanelDiffEntry,
   type PanelDiffStatus,
   type PanelFieldChange,
+  type TabPanelDiff,
 } from './panelVersionDiff';
 
 const GRID_COLUMNS = 24;
@@ -30,7 +31,7 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
 
   const activeTab = diff.tabs.find((tab) => tab.tabId === selectedTabId) ?? diff.tabs[0];
   const tabOptions = diff.tabs.map((tab) => ({
-    label: tab.tabTitle || t('dashboard-scene.version-history-visual.default-tab', 'Dashboard'),
+    label: tabPickerLabel(tab, diff.tabs),
     value: tab.tabId,
   }));
 
@@ -127,6 +128,16 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
       {selectedPanel && <PanelDetailDrawer entry={selectedPanel} onClose={() => setSelectedPanel(null)} />}
     </Stack>
   );
+}
+
+function tabPickerLabel(tab: TabPanelDiff, tabs: TabPanelDiff[]): string {
+  const fallback = t('dashboard-scene.version-history-visual.default-tab', 'Dashboard');
+  const title = tab.tabTitle || fallback;
+  const hasDuplicateTitle = tabs.some((other) => other.tabId !== tab.tabId && (other.tabTitle || fallback) === title);
+  if (hasDuplicateTitle && tab.titlePath.length > 1) {
+    return tab.titlePath.join(' / ');
+  }
+  return title;
 }
 
 function LegendItem({ status }: { status: PanelDiffStatus }) {

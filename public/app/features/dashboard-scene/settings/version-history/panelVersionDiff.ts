@@ -28,6 +28,7 @@ export type NormalizedPanel = {
   autoGridIndex?: number;
   tabId: string;
   tabTitle: string;
+  titlePath: string[];
 };
 
 export type PanelDiffEntry = {
@@ -42,6 +43,7 @@ export type PanelDiffEntry = {
 export type TabPanelDiff = {
   tabId: string;
   tabTitle: string;
+  titlePath: string[];
   panels: PanelDiffEntry[];
 };
 
@@ -125,6 +127,7 @@ function normalizeV1Panel(panel: JsonObject, tabId: string, tabTitle: string): N
     gridPos: gridPos ? { x: gridPos.x ?? 0, y: gridPos.y ?? 0, w: gridPos.w ?? 12, h: gridPos.h ?? 8 } : undefined,
     tabId,
     tabTitle,
+    titlePath: tabTitle ? [tabTitle] : [],
   };
 }
 
@@ -156,6 +159,7 @@ function walkV1Panels(panels: unknown[], tabId: string, tabTitle: string, out: N
 type ExtractedTabPanels = {
   tabId: string;
   tabTitle: string;
+  titlePath: string[];
   panels: NormalizedPanel[];
 };
 
@@ -164,12 +168,12 @@ function panelsToTabMap(normalized: NormalizedPanel[]): Map<string, ExtractedTab
   for (const panel of normalized) {
     const tabId = panel.tabId || DEFAULT_TAB_ID;
     if (!map.has(tabId)) {
-      map.set(tabId, { tabId, tabTitle: panel.tabTitle, panels: [] });
+      map.set(tabId, { tabId, tabTitle: panel.tabTitle, titlePath: panel.titlePath, panels: [] });
     }
     map.get(tabId)!.panels.push(panel);
   }
   if (map.size === 0) {
-    map.set(DEFAULT_TAB_ID, { tabId: DEFAULT_TAB_ID, tabTitle: DEFAULT_TAB_TITLE, panels: [] });
+    map.set(DEFAULT_TAB_ID, { tabId: DEFAULT_TAB_ID, tabTitle: DEFAULT_TAB_TITLE, titlePath: [], panels: [] });
   }
   return map;
 }
@@ -187,7 +191,8 @@ function normalizeV2Panel(
   gridPos: GridPos | undefined,
   autoGridIndex: number | undefined,
   tabId: string,
-  tabTitle: string
+  tabTitle: string,
+  titlePath: string[]
 ): NormalizedPanel | undefined {
   const spec = panelKind.spec as JsonObject | undefined;
   if (!spec) {
@@ -228,6 +233,7 @@ function normalizeV2Panel(
     autoGridIndex,
     tabId,
     tabTitle,
+    titlePath,
   };
 }
 
@@ -248,7 +254,7 @@ function gridLayoutExtent(items: JsonObject[]): number {
 function walkV2Layout(
   layout: JsonObject,
   elements: JsonObject,
-  ctx: { yOffset: number; tabId: string; tabTitle: string; layoutPath: string },
+  ctx: { yOffset: number; tabId: string; tabTitle: string; layoutPath: string; titlePath: string[] },
   out: NormalizedPanel[]
 ): number {
   const kind = layout.kind as string | undefined;
@@ -276,7 +282,15 @@ function walkV2Layout(
         w: Number(itemSpec?.width ?? 12),
         h: Number(itemSpec?.height ?? 8),
       };
-      const normalized = normalizeV2Panel(element, elementName, gridPos, undefined, ctx.tabId, ctx.tabTitle);
+      const normalized = normalizeV2Panel(
+        element,
+        elementName,
+        gridPos,
+        undefined,
+        ctx.tabId,
+        ctx.tabTitle,
+        ctx.titlePath
+      );
       if (normalized) {
         out.push(normalized);
       }
@@ -297,7 +311,15 @@ function walkV2Layout(
       if (!isVisualDiffElement(element)) {
         return;
       }
-      const normalized = normalizeV2Panel(element, elementName, undefined, index, ctx.tabId, ctx.tabTitle);
+      const normalized = normalizeV2Panel(
+        element,
+        elementName,
+        undefined,
+        index,
+        ctx.tabId,
+        ctx.tabTitle,
+        ctx.titlePath
+      );
       if (normalized) {
         out.push(normalized);
       }
@@ -312,9 +334,10 @@ function walkV2Layout(
       const tabTitle = String(tabSpec?.title ?? '');
       // Path keys keep duplicate titles, nested tabs, and sibling tab groups distinct.
       const tabId = childLayoutPath(ctx.layoutPath, `tab-${index}`);
+      const titlePath = tabTitle ? [...ctx.titlePath, tabTitle] : ctx.titlePath;
       const innerLayout = tabSpec?.layout as JsonObject | undefined;
       if (innerLayout) {
-        walkV2Layout(innerLayout, elements, { yOffset: 0, tabId, tabTitle, layoutPath: tabId }, out);
+        walkV2Layout(innerLayout, elements, { yOffset: 0, tabId, tabTitle, layoutPath: tabId, titlePath }, out);
       }
     }
     return 0;
@@ -330,10 +353,12 @@ function walkV2Layout(
       if (!innerLayout) {
         continue;
       }
+      const rowTitle = String(rowSpec?.title ?? '');
+      const titlePath = rowTitle ? [...ctx.titlePath, rowTitle] : ctx.titlePath;
       const rowHeight = walkV2Layout(
         innerLayout,
         elements,
-        { ...ctx, yOffset, layoutPath: childLayoutPath(ctx.layoutPath, `row-${rowIndex}`) },
+        { ...ctx, yOffset, layoutPath: childLayoutPath(ctx.layoutPath, `row-${rowIndex}`), titlePath },
         out
       );
       yOffset += rowHeight;
@@ -353,12 +378,12 @@ function extractV2Panels(data: object): Map<string, ExtractedTabPanels> {
 
   const rootKind = layout.kind as string | undefined;
   if (rootKind === 'TabsLayout') {
-    walkV2Layout(layout, elements, { yOffset: 0, tabId: '', tabTitle: '', layoutPath: '' }, normalized);
+    walkV2Layout(layout, elements, { yOffset: 0, tabId: '', tabTitle: '', layoutPath: '', titlePath: [] }, normalized);
   } else {
     walkV2Layout(
       layout,
       elements,
-      { yOffset: 0, tabId: DEFAULT_TAB_ID, tabTitle: DEFAULT_TAB_TITLE, layoutPath: '' },
+      { yOffset: 0, tabId: DEFAULT_TAB_ID, tabTitle: DEFAULT_TAB_TITLE, layoutPath: '', titlePath: [] },
       normalized
     );
   }
@@ -525,6 +550,13 @@ export function computeVisualPanelVersionDiff(baseData: object, newData: object)
     const baseTab = baseTabs.get(tabId);
     const newTab = newTabs.get(tabId);
     const tabTitle = newTab?.tabTitle || baseTab?.tabTitle || tabId;
+    const titlePath = newTab?.titlePath?.length
+      ? newTab.titlePath
+      : baseTab?.titlePath?.length
+        ? baseTab.titlePath
+        : tabTitle
+          ? [tabTitle]
+          : [];
 
     const baseLookup = panelLookupById(baseTab);
     const newLookup = panelLookupById(newTab);
@@ -550,7 +582,7 @@ export function computeVisualPanelVersionDiff(baseData: object, newData: object)
       return indexA - indexB;
     });
 
-    tabs.push({ tabId, tabTitle, panels });
+    tabs.push({ tabId, tabTitle, titlePath, panels });
   }
 
   return { hasTabs, tabs };

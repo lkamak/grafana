@@ -162,6 +162,144 @@ describe('VisualDashboardDiff', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('disambiguates sibling tabs that share a title with their row path', async () => {
+    const user = userEvent.setup();
+
+    const makeDashboard = () => ({
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            {
+              kind: 'RowsLayoutRow',
+              spec: {
+                title: 'Row A',
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        kind: 'TabsLayoutTab',
+                        spec: {
+                          title: 'CPU',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [
+                                {
+                                  kind: 'GridLayoutItem',
+                                  spec: {
+                                    x: 0,
+                                    y: 0,
+                                    width: 12,
+                                    height: 8,
+                                    element: { kind: 'ElementReference', name: 'p1' },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              kind: 'RowsLayoutRow',
+              spec: {
+                title: 'Row B',
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        kind: 'TabsLayoutTab',
+                        spec: {
+                          title: 'CPU',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [
+                                {
+                                  kind: 'GridLayoutItem',
+                                  spec: {
+                                    x: 0,
+                                    y: 0,
+                                    width: 12,
+                                    height: 8,
+                                    element: { kind: 'ElementReference', name: 'p2' },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      elements: {
+        p1: {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Row A CPU',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+        p2: {
+          kind: 'Panel',
+          spec: {
+            id: 2,
+            title: 'Row B CPU',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+      },
+    });
+
+    renderDiff(makeDashboard(), makeDashboard());
+
+    expect(await screen.findByRole('radio', { name: 'Row A / CPU' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Row B / CPU' })).toBeInTheDocument();
+    expect(screen.queryAllByRole('radio', { name: 'CPU' })).toHaveLength(0);
+
+    expect(
+      await screen.findByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(1))
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(2))
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Row B / CPU' }));
+
+    expect(
+      await screen.findByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(2))
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(1))
+    ).not.toBeInTheDocument();
+  });
+
   it('keeps replaced panels at the same grid cell independently clickable', async () => {
     const user = userEvent.setup();
     const base = {
