@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import {
   alignTimeRangeCompareData,
@@ -42,6 +42,7 @@ export const TimeSeriesPanel = ({
   options,
   fieldConfig,
   onChangeTimeRange,
+  onFieldConfigChange,
   onOptionsChange,
   replaceVariables,
   id,
@@ -54,7 +55,15 @@ export const TimeSeriesPanel = ({
     canExecuteActions,
     getFiltersBasedOnGrouping,
     onAddAdHocFilters,
+    onInstanceStateChange,
   } = usePanelContext();
+
+  useEffect(() => {
+    onInstanceStateChange?.({
+      applyFieldConfig: onFieldConfigChange,
+      fieldConfig,
+    });
+  }, [fieldConfig, onFieldConfigChange, onInstanceStateChange]);
 
   const { dataLinkPostProcessor } = useDataLinksContext();
 

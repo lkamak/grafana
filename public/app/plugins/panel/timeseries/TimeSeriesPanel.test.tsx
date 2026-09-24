@@ -148,6 +148,30 @@ describe('TimeSeriesPanel', () => {
     expect(screen.queryByTestId(selectors.components.VizLayout.legend)).not.toBeInTheDocument();
   });
 
+  it('publishes field config apply helpers for the threshold-from-data editor', () => {
+    const onInstanceStateChange = jest.fn();
+    const onFieldConfigChange = jest.fn();
+    const props = getPanelProps<Options>(defaultOptions, { onFieldConfigChange });
+    props.data.series = [validFrame];
+
+    render(
+      <PanelContextProvider
+        value={{
+          eventsScope: 'test',
+          eventBus: new EventBusSrv(),
+          onInstanceStateChange,
+        }}
+      >
+        <TimeSeriesPanel {...props} />
+      </PanelContextProvider>
+    );
+
+    expect(onInstanceStateChange).toHaveBeenCalledWith({
+      applyFieldConfig: onFieldConfigChange,
+      fieldConfig: props.fieldConfig,
+    });
+  });
+
   describe('faceted filter pin-to-sidebar persistence', () => {
     it('calls onOptionsChange with facetedFilterPinned: true when "Pin to sidebar" is clicked', async () => {
       const { onOptionsChange, props } = renderPanelWithFacetedFilter();

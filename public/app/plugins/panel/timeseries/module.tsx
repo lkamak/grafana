@@ -14,7 +14,7 @@ import { timeseriesSuggestionsSupplier } from './suggestions';
 
 export const plugin = new PanelPlugin<Options, FieldConfig>(TimeSeriesPanel)
   .setPanelChangeHandler(graphPanelChangedHandler)
-  .useFieldConfig(getGraphFieldConfig(defaultGraphConfig))
+  .useFieldConfig(getGraphFieldConfig(defaultGraphConfig, true, { suggestThresholdFromData: true }))
   .setPanelOptions((builder) => {
     commonOptionsBuilder.addTooltipOptions(builder, false, true, optsWithHideZeros);
     commonOptionsBuilder.addLegendOptions(builder, true, true);
