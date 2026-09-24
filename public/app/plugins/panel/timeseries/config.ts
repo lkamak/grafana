@@ -25,6 +25,7 @@ import { getGraphFieldOptions, commonOptionsBuilder } from '@grafana/ui';
 import { InsertNullsEditor } from './InsertNullsEditor';
 import { LineStyleEditor } from './LineStyleEditor';
 import { SpanNullsEditor } from './SpanNullsEditor';
+import { ThresholdFromDataEditor } from './ThresholdFromDataEditor';
 import { ThresholdsStyleEditor } from './ThresholdsStyleEditor';
 export const defaultGraphConfig: GraphFieldConfig = {
   drawStyle: GraphDrawStyle.Line,
@@ -266,11 +267,28 @@ export function getGraphFieldConfig(cfg: GraphFieldConfig, isTime = true): SetFi
       commonOptionsBuilder.addAxisConfig(builder, cfg);
       commonOptionsBuilder.addHideFrom(builder);
 
+      const thresholdsCategory = [t('timeseries.config.get-graph-field-config.category-thresholds', 'Thresholds')];
+
+      builder.addCustomEditor({
+        id: 'thresholdFromData',
+        path: 'thresholdFromData',
+        name: t('timeseries.config.get-graph-field-config.name-threshold-from-data', 'Threshold from data'),
+        description: t(
+          'timeseries.config.get-graph-field-config.description-threshold-from-data',
+          'Compute p95 from the current query result and preview it as a threshold line'
+        ),
+        category: thresholdsCategory,
+        editor: ThresholdFromDataEditor,
+        override: ThresholdFromDataEditor,
+        process: identityOverrideProcessor,
+        shouldApply: () => false,
+      });
+
       builder.addCustomEditor({
         id: 'thresholdsStyle',
         path: 'thresholdsStyle',
         name: t('timeseries.config.get-graph-field-config.name-show-thresholds', 'Show thresholds'),
-        category: [t('timeseries.config.get-graph-field-config.category-thresholds', 'Thresholds')],
+        category: thresholdsCategory,
         defaultValue: { mode: GraphThresholdsStyleMode.Off },
         settings: {
           options: graphFieldOptions.thresholdsDisplayModes,
