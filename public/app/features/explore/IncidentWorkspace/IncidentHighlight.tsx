@@ -6,39 +6,41 @@ import { selectors } from '@grafana/e2e-selectors';
 import { t, Trans } from '@grafana/i18n';
 import { useStyles2 } from '@grafana/ui';
 
-import { clampRangeToView, overlayOffsets } from './incidentRange';
+import { clampRangeToView, type IncidentDragTarget, overlayOffsets, rangeFromTrackPointer } from './incidentRange';
 import { useIncidentWorkspace } from './IncidentWorkspaceContext';
 
 interface Props {
   viewRange: AbsoluteTimeRange;
 }
 
-type DragTarget = 'from' | 'to' | 'range';
-
 export function IncidentHighlight({ viewRange }: Props) {
   const styles = useStyles2(getStyles);
   const { active, range, setRange } = useIncidentWorkspace();
   const trackRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<{ target: DragTarget; startX: number; origin: AbsoluteTimeRange } | null>(null);
+  const dragRef = useRef<{ target: IncidentDragTarget; startX: number; origin: AbsoluteTimeRange } | null>(null);
 
   const applyPointer = useCallback(
-    (clientX: number, target: DragTarget, origin: AbsoluteTimeRange) => {
+    (clientX: number, target: IncidentDragTarget, origin: AbsoluteTimeRange) => {
       const track = trackRef.current;
       if (!track) {
         return;
       }
       const rect = track.getBoundingClientRect();
-      const span = viewRange.to - viewRange.from;
-      if (rect.width <= 0 || span <= 0) {
-        return;
-      }
-      const next = posToRange(clientX, rect, viewRange, target, origin, dragRef.current?.startX ?? clientX);
+      const next = rangeFromTrackPointer(
+        clientX,
+        rect.left,
+        rect.width,
+        viewRange,
+        target,
+        origin,
+        dragRef.current?.startX ?? clientX
+      );
       setRange(clampRangeToView(next, viewRange));
     },
     [setRange, viewRange]
   );
 
-  const onPointerDown = (event: PointerEvent<HTMLElement>, target: DragTarget) => {
+  const onPointerDown = (event: PointerEvent<HTMLElement>, target: IncidentDragTarget) => {
     if (!range) {
       return;
     }
@@ -131,36 +133,17 @@ function nearestHandle(
   track: HTMLDivElement | null,
   range: AbsoluteTimeRange,
   view: AbsoluteTimeRange
-): DragTarget {
+): IncidentDragTarget {
   if (!track) {
     return 'range';
   }
   const rect = track.getBoundingClientRect();
   const span = view.to - view.from;
+  if (rect.width <= 0 || span <= 0) {
+    return 'range';
+  }
   const at = view.from + ((event.clientX - rect.left) / rect.width) * span;
   return Math.abs(at - range.from) <= Math.abs(at - range.to) ? 'from' : 'to';
-}
-
-function posToRange(
-  clientX: number,
-  rect: DOMRect,
-  view: AbsoluteTimeRange,
-  target: DragTarget,
-  origin: AbsoluteTimeRange,
-  startX: number
-): AbsoluteTimeRange {
-  const span = view.to - view.from;
-  const value = view.from + ((clientX - rect.left) / rect.width) * span;
-
-  if (target === 'from') {
-    return { from: Math.min(value, origin.to), to: origin.to };
-  }
-  if (target === 'to') {
-    return { from: origin.from, to: Math.max(value, origin.from) };
-  }
-
-  const delta = ((clientX - startX) / rect.width) * span;
-  return { from: origin.from + delta, to: origin.to + delta };
 }
 
 const getStyles = (theme: GrafanaTheme2) => ({
