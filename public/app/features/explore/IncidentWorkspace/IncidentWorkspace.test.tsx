@@ -111,6 +111,34 @@ describe('IncidentWorkspace', () => {
     expect(screen.getAllByText(`${dateTime(2000).toISOString()} → ${dateTime(4000).toISOString()}`)).toHaveLength(2);
   });
 
+  it('keeps the incident labels when the pane view no longer contains the range', async () => {
+    const user = userEvent.setup();
+    const store = configureStore({
+      explore: {
+        ...initialExploreState,
+        syncedTimes: true,
+        panes: {
+          left: makeExplorePaneState(),
+          right: makeExplorePaneState(),
+        },
+      },
+    });
+
+    render(
+      <TestProvider store={store}>
+        <IncidentWorkspaceProvider>
+          <IncidentWorkspaceButton exploreId="left" viewRange={viewRange} />
+          <IncidentHighlight viewRange={{ from: 10_000, to: 20_000 }} />
+        </IncidentWorkspaceProvider>
+      </TestProvider>
+    );
+
+    await user.click(screen.getByTestId(selectors.pages.Explore.toolbar.incidentWorkspaceButton));
+
+    expect(screen.getByText(`${dateTime(2000).toISOString()} → ${dateTime(4000).toISOString()}`)).toBeInTheDocument();
+    expect(screen.queryByRole('slider', { name: /incident range start/i })).not.toBeInTheDocument();
+  });
+
   it('leaves incident workspace without removing split or query controls', async () => {
     const user = userEvent.setup();
     setup(true);

@@ -13,10 +13,16 @@ export function defaultIncidentRange(view: AbsoluteTimeRange): AbsoluteTimeRange
 export function clampRangeToView(range: AbsoluteTimeRange, view: AbsoluteTimeRange): AbsoluteTimeRange {
   const from = Math.min(Math.max(range.from, view.from), view.to);
   const to = Math.max(Math.min(range.to, view.to), view.from);
-  if (to <= from) {
-    return defaultIncidentRange(view);
+  if (to > from) {
+    return { from, to };
   }
-  return { from, to };
+  // A handle drag stops when it meets the other handle, so an empty span can still
+  // sit inside the view. Only a range that misses the view should fall back to the default band.
+  const collapsedInsideView = from === to && range.from <= view.to && range.to >= view.from;
+  if (collapsedInsideView) {
+    return { from, to };
+  }
+  return defaultIncidentRange(view);
 }
 
 export function rangeFromTrackPointer(
@@ -52,14 +58,18 @@ export function rangeFromTrackPointer(
   return { from: origin.from + delta, to: origin.to + delta };
 }
 
-export function overlayOffsets(range: AbsoluteTimeRange, view: AbsoluteTimeRange): { left: number; width: number } {
+export function overlayOffsets(
+  range: AbsoluteTimeRange,
+  view: AbsoluteTimeRange
+): { left: number; width: number } | null {
   const span = view.to - view.from;
-  if (span <= 0) {
-    return { left: 0, width: 0 };
+  if (span <= 0 || range.to < view.from || range.from > view.to) {
+    return null;
   }
-  const clamped = clampRangeToView(range, view);
+  const from = Math.max(range.from, view.from);
+  const to = Math.min(range.to, view.to);
   return {
-    left: ((clamped.from - view.from) / span) * 100,
-    width: ((clamped.to - clamped.from) / span) * 100,
+    left: ((from - view.from) / span) * 100,
+    width: (Math.max(to - from, 0) / span) * 100,
   };
 }

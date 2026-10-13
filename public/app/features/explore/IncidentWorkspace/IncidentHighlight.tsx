@@ -88,42 +88,46 @@ export function IncidentHighlight({ viewRange }: Props) {
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        <div className={styles.selected} style={{ left: `${offsets.left}%`, width: `${offsets.width}%` }}>
-          <button
-            type="button"
-            className={styles.handle}
-            style={{ left: 0 }}
-            aria-label={t('explore.incident-workspace.start-handle', 'Incident range start')}
-            aria-valuemin={viewRange.from}
-            aria-valuemax={viewRange.to}
-            aria-valuenow={range.from}
-            role="slider"
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              onPointerDown(event, 'from');
-            }}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          />
-          <button
-            type="button"
-            className={styles.handle}
-            style={{ left: '100%' }}
-            aria-label={t('explore.incident-workspace.end-handle', 'Incident range end')}
-            aria-valuemin={viewRange.from}
-            aria-valuemax={viewRange.to}
-            aria-valuenow={range.to}
-            role="slider"
-            onPointerDown={(event) => {
-              event.stopPropagation();
-              onPointerDown(event, 'to');
-            }}
-            onPointerMove={onPointerMove}
-            onPointerUp={onPointerUp}
-          />
-        </div>
+        {offsets && (
+          <div className={styles.selected} style={{ left: `${offsets.left}%`, width: `${offsets.width}%` }}>
+            <button
+              type="button"
+              className={styles.handle}
+              style={{ left: 0 }}
+              aria-label={t('explore.incident-workspace.start-handle', 'Incident range start')}
+              aria-valuemin={viewRange.from}
+              aria-valuemax={viewRange.to}
+              aria-valuenow={range.from}
+              role="slider"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                onPointerDown(event, 'from');
+              }}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+            />
+            <button
+              type="button"
+              className={styles.handle}
+              style={{ left: '100%' }}
+              aria-label={t('explore.incident-workspace.end-handle', 'Incident range end')}
+              aria-valuemin={viewRange.from}
+              aria-valuemax={viewRange.to}
+              aria-valuenow={range.to}
+              role="slider"
+              onPointerDown={(event) => {
+                event.stopPropagation();
+                onPointerDown(event, 'to');
+              }}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+            />
+          </div>
+        )}
       </div>
-      <div className={styles.band} style={{ left: `${offsets.left}%`, width: `${offsets.width}%` }} aria-hidden />
+      {offsets && (
+        <div className={styles.band} style={{ left: `${offsets.left}%`, width: `${offsets.width}%` }} aria-hidden />
+      )}
     </div>
   );
 }
