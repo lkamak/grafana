@@ -4,6 +4,7 @@ import { type ComponentProps } from 'react';
 import type AutoSizer from 'react-virtualized-auto-sizer';
 
 import { EventBusSrv, serializeStateToUrlParam } from '@grafana/data';
+import { selectors } from '@grafana/e2e-selectors';
 
 import * as mainState from '../state/main';
 
@@ -191,6 +192,30 @@ describe('Handles open/close splits and related events in UI and URL', () => {
     // Editor renders the new query
     expect(await screen.findByText(`elastic Editor input: error`)).toBeInTheDocument();
     expect(await screen.findByText(`loki Editor input: { label="value"}`)).toBeInTheDocument();
+  });
+
+  it('enters incident workspace from split without blocking close', async () => {
+    setupExplore();
+
+    const splitButton = await screen.findByRole('button', { name: /split/i });
+    await userEvent.click(splitButton);
+    await waitForExplore('left');
+
+    const workspaceButtons = await screen.findAllByTestId(selectors.pages.Explore.toolbar.incidentWorkspaceButton);
+    expect(workspaceButtons.length).toBe(2);
+    await userEvent.click(workspaceButtons[0]);
+
+    const highlights = await screen.findAllByTestId(selectors.pages.Explore.General.incidentWorkspace);
+    expect(highlights.length).toBe(2);
+    expect(screen.getAllByLabelText(/Synced times/i).length).toBeGreaterThan(0);
+
+    const closeButtons = await screen.findAllByLabelText(/Close split pane/i);
+    await userEvent.click(closeButtons[1]);
+
+    await waitFor(() => {
+      expect(screen.queryAllByLabelText(/Close split pane/i)).toHaveLength(0);
+      expect(screen.queryByTestId(selectors.pages.Explore.General.incidentWorkspace)).not.toBeInTheDocument();
+    });
   });
 
   it('handles split size events and sets relevant variables', async () => {

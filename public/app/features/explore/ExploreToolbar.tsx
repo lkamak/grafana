@@ -26,6 +26,7 @@ import { updateFiscalYearStartMonthForSession, updateTimeZoneForSession } from '
 import { getFiscalYearStartMonth, getTimeZone } from '../profile/state/selectors';
 
 import { ExploreTimeControls } from './ExploreTimeControls';
+import { IncidentWorkspaceButton } from './IncidentWorkspace/IncidentWorkspaceButton';
 import { LiveTailButton } from './LiveTailButton';
 import { ShortLinkButtonMenu } from './ShortLinkButtonMenu';
 import { ToolbarExtensionPoint } from './extensions/ToolbarExtensionPoint';
@@ -291,6 +292,13 @@ export function ExploreToolbar({ exploreId, onChangeTime, onContentOutlineToogle
             timeZone={timeZone}
             extensionsToShow="basic"
           />,
+          splitted && (
+            <IncidentWorkspaceButton
+              key="incident-workspace"
+              exploreId={exploreId}
+              viewRange={{ from: range.from.valueOf(), to: range.to.valueOf() }}
+            />
+          ),
           !isLive && (
             <ExploreTimeControls
               key="timeControls"
