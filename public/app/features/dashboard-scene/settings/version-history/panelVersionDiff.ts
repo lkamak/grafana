@@ -443,6 +443,25 @@ function formatGridPos(pos?: GridPos, autoGridIndex?: number): string {
   return `x:${pos.x} y:${pos.y} w:${pos.w} h:${pos.h}`;
 }
 
+// v1 queries store expr/query/rawSql as strings. v2 stores a DataQueryKind on `query`
+// (kind/group/spec); the expression lives under spec and must not be stringified as an object.
+function queryDisplayText(value: unknown, depth = 0): string {
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+  if (!value || typeof value !== 'object' || depth > 2) {
+    return '';
+  }
+
+  const obj = value as JsonObject;
+  const fields = obj.spec && typeof obj.spec === 'object' ? (obj.spec as JsonObject) : obj;
+  const text = fields.expr ?? fields.query ?? fields.rawSql;
+  if (text && typeof text === 'object') {
+    return queryDisplayText(text, depth + 1);
+  }
+  return text != null && text !== '' ? String(text) : '';
+}
+
 export function formatQueriesForDisplay(serialized: string): string {
   if (!serialized) {
     return '—';
@@ -458,8 +477,7 @@ export function formatQueriesForDisplay(serialized: string): string {
       }
       const q = raw as JsonObject;
       const refId = q.refId != null ? String(q.refId) : '?';
-      const text = q.expr ?? q.query ?? q.rawSql;
-      const queryText = text != null && text !== '' ? String(text) : '';
+      const queryText = queryDisplayText(q);
       return queryText ? `${refId}: ${queryText}` : refId;
     });
     return parts.length > 0 ? parts.join('; ') : '—';

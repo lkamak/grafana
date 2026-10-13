@@ -1,8 +1,4 @@
-import {
-  computeVisualPanelVersionDiff,
-  formatQueriesForDisplay,
-  formatThresholdsForDisplay,
-} from './panelVersionDiff';
+import { computeVisualPanelVersionDiff, formatQueriesForDisplay, formatThresholdsForDisplay } from './panelVersionDiff';
 
 describe('computeVisualPanelVersionDiff', () => {
   it('classifies v1 panel add, remove, change, and move', () => {
@@ -782,6 +778,31 @@ describe('computeVisualPanelVersionDiff', () => {
 describe('formatQueriesForDisplay', () => {
   it('returns em dash for empty serialized queries', () => {
     expect(formatQueriesForDisplay('')).toBe('—');
+  });
+
+  it('formats v1 string fields and v2 DataQuery objects', () => {
+    expect(formatQueriesForDisplay(JSON.stringify([{ refId: 'A', expr: 'cpu' }]))).toBe('A: cpu');
+    expect(formatQueriesForDisplay(JSON.stringify([{ refId: 'A', query: 'stats.gauges.*' }]))).toBe(
+      'A: stats.gauges.*'
+    );
+    expect(formatQueriesForDisplay(JSON.stringify([{ refId: 'A', rawSql: 'SELECT 1' }]))).toBe('A: SELECT 1');
+
+    const v2 = JSON.stringify([
+      {
+        refId: 'A',
+        query: { kind: 'DataQuery', group: 'prometheus', spec: { expr: 'up' } },
+      },
+      {
+        refId: 'B',
+        query: { kind: 'DataQuery', group: 'mysql', spec: { rawSql: 'SELECT 1' } },
+      },
+      {
+        refId: 'C',
+        query: { kind: 'DataQuery', group: 'graphite', spec: { query: 'stats.gauges.*' } },
+      },
+    ]);
+    expect(formatQueriesForDisplay(v2)).toBe('A: up; B: SELECT 1; C: stats.gauges.*');
+    expect(formatQueriesForDisplay(v2)).not.toContain('[object Object]');
   });
 });
 
