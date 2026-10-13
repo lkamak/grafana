@@ -443,6 +443,59 @@ function formatGridPos(pos?: GridPos, autoGridIndex?: number): string {
   return `x:${pos.x} y:${pos.y} w:${pos.w} h:${pos.h}`;
 }
 
+export function formatQueriesForDisplay(serialized: string): string {
+  if (!serialized) {
+    return '—';
+  }
+  try {
+    const parsed = JSON.parse(serialized) as unknown;
+    if (!Array.isArray(parsed)) {
+      return serialized;
+    }
+    const parts = parsed.map((raw) => {
+      if (!raw || typeof raw !== 'object') {
+        return String(raw);
+      }
+      const q = raw as JsonObject;
+      const refId = q.refId != null ? String(q.refId) : '?';
+      const text = q.expr ?? q.query ?? q.rawSql;
+      const queryText = text != null && text !== '' ? String(text) : '';
+      return queryText ? `${refId}: ${queryText}` : refId;
+    });
+    return parts.length > 0 ? parts.join('; ') : '—';
+  } catch {
+    return serialized;
+  }
+}
+
+export function formatThresholdsForDisplay(serialized: string): string {
+  if (!serialized) {
+    return '—';
+  }
+  try {
+    const parsed = JSON.parse(serialized) as JsonObject;
+    const mode = parsed.mode != null ? String(parsed.mode) : '';
+    const steps = Array.isArray(parsed.steps) ? parsed.steps : [];
+    if (steps.length === 0) {
+      return mode || '—';
+    }
+    const stepSummary = steps
+      .map((step) => {
+        if (!step || typeof step !== 'object') {
+          return String(step);
+        }
+        const s = step as JsonObject;
+        const value = s.value ?? 'base';
+        const color = s.color != null ? String(s.color) : '';
+        return color ? `${value}=${color}` : String(value);
+      })
+      .join(', ');
+    return mode ? `${mode}: ${stepSummary}` : stepSummary;
+  } catch {
+    return serialized;
+  }
+}
+
 function fieldsEqual(a: NormalizedPanel, b: NormalizedPanel): boolean {
   return (
     a.title === b.title &&
@@ -473,13 +526,21 @@ function buildFieldChanges(base: NormalizedPanel, current: NormalizedPanel): Pan
     changes.push({ field: 'title', before: base.title, after: current.title });
   }
   if (base.queries !== current.queries) {
-    changes.push({ field: 'query', before: base.queries || '—', after: current.queries || '—' });
+    changes.push({
+      field: 'query',
+      before: formatQueriesForDisplay(base.queries),
+      after: formatQueriesForDisplay(current.queries),
+    });
   }
   if (base.vizType !== current.vizType) {
     changes.push({ field: 'vizType', before: base.vizType, after: current.vizType });
   }
   if (base.thresholds !== current.thresholds) {
-    changes.push({ field: 'thresholds', before: base.thresholds || '—', after: current.thresholds || '—' });
+    changes.push({
+      field: 'thresholds',
+      before: formatThresholdsForDisplay(base.thresholds),
+      after: formatThresholdsForDisplay(current.thresholds),
+    });
   }
   if (base.libraryPanelUid !== current.libraryPanelUid) {
     changes.push({

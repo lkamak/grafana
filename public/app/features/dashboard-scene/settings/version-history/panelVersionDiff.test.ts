@@ -1,4 +1,8 @@
-import { computeVisualPanelVersionDiff } from './panelVersionDiff';
+import {
+  computeVisualPanelVersionDiff,
+  formatQueriesForDisplay,
+  formatThresholdsForDisplay,
+} from './panelVersionDiff';
 
 describe('computeVisualPanelVersionDiff', () => {
   it('classifies v1 panel add, remove, change, and move', () => {
@@ -737,5 +741,52 @@ describe('computeVisualPanelVersionDiff', () => {
     expect(result.tabs[0].tabTitle).toBe('Summary');
     expect(result.tabs[0].panels).toHaveLength(1);
     expect(result.tabs[0].panels[0].status).toBe('unchanged');
+  });
+
+  it('formats query and threshold field changes for display', () => {
+    const base = {
+      panels: [
+        {
+          id: 1,
+          type: 'timeseries',
+          title: 'CPU',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+          targets: [{ refId: 'A', expr: 'cpu' }],
+        },
+      ],
+    };
+    const current = {
+      panels: [
+        {
+          id: 1,
+          type: 'timeseries',
+          title: 'CPU',
+          gridPos: { x: 0, y: 0, w: 12, h: 8 },
+          targets: [{ refId: 'A', expr: 'cpu_usage' }],
+          fieldConfig: { defaults: { thresholds: { mode: 'absolute', steps: [{ value: 0, color: 'green' }] } } },
+        },
+      ],
+    };
+
+    const entry = computeVisualPanelVersionDiff(base, current).tabs[0].panels[0];
+    const queryChange = entry.fieldChanges.find((c) => c.field === 'query');
+    const thresholdChange = entry.fieldChanges.find((c) => c.field === 'thresholds');
+
+    expect(queryChange?.before).toBe('A: cpu');
+    expect(queryChange?.after).toBe('A: cpu_usage');
+    expect(thresholdChange?.before).toBe('—');
+    expect(thresholdChange?.after).toBe('absolute: 0=green');
+  });
+});
+
+describe('formatQueriesForDisplay', () => {
+  it('returns em dash for empty serialized queries', () => {
+    expect(formatQueriesForDisplay('')).toBe('—');
+  });
+});
+
+describe('formatThresholdsForDisplay', () => {
+  it('returns em dash for empty serialized thresholds', () => {
+    expect(formatThresholdsForDisplay('')).toBe('—');
   });
 });

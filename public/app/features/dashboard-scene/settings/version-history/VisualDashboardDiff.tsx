@@ -2,9 +2,9 @@ import { css } from '@emotion/css';
 import { useMemo, useState } from 'react';
 
 import { type GrafanaTheme2 } from '@grafana/data';
+import { selectors } from '@grafana/e2e-selectors';
 import { Trans, t } from '@grafana/i18n';
 import { Badge, Drawer, Icon, RadioButtonGroup, Stack, Text, useStyles2 } from '@grafana/ui';
-import { selectors } from '@grafana/e2e-selectors';
 
 import {
   computeVisualPanelVersionDiff,
@@ -30,10 +30,15 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
   const styles = useStyles2(getStyles);
 
   const activeTab = diff.tabs.find((tab) => tab.tabId === selectedTabId) ?? diff.tabs[0];
-  const tabOptions = diff.tabs.map((tab) => ({
-    label: tabPickerLabel(tab, diff.tabs),
-    value: tab.tabId,
-  }));
+  const tabOptions = diff.tabs.map((tab) => {
+    const label = tabPickerLabel(tab, diff.tabs);
+    return {
+      value: tab.tabId,
+      component: () => (
+        <span data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffTab(label)}>{label}</span>
+      ),
+    };
+  });
 
   if (!activeTab || activeTab.panels.length === 0) {
     return (
@@ -360,6 +365,7 @@ const getStyles = (theme: GrafanaTheme2) => {
     canvas: css({
       display: 'grid',
       gridTemplateColumns: `repeat(${GRID_COLUMNS}, minmax(0, 1fr))`,
+      gridAutoRows: theme.spacing(4),
       gap: theme.spacing(1),
       position: 'relative',
       minHeight: theme.spacing(12),
