@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TestProvider } from 'test/helpers/TestProvider';
 
@@ -136,6 +136,41 @@ describe('IncidentWorkspace', () => {
     await user.click(screen.getByTestId(selectors.pages.Explore.toolbar.incidentWorkspaceButton));
 
     expect(screen.getByText(`${dateTime(2000).toISOString()} → ${dateTime(4000).toISOString()}`)).toBeInTheDocument();
+    expect(screen.queryByRole('slider', { name: /incident range start/i })).not.toBeInTheDocument();
+  });
+
+  it('does not replace an off-screen incident when the track is clicked', async () => {
+    const user = userEvent.setup();
+    const store = configureStore({
+      explore: {
+        ...initialExploreState,
+        syncedTimes: true,
+        panes: {
+          left: makeExplorePaneState(),
+          right: makeExplorePaneState(),
+        },
+      },
+    });
+
+    render(
+      <TestProvider store={store}>
+        <IncidentWorkspaceProvider>
+          <IncidentWorkspaceButton exploreId="left" viewRange={viewRange} />
+          <IncidentHighlight viewRange={{ from: 10_000, to: 20_000 }} />
+        </IncidentWorkspaceProvider>
+      </TestProvider>
+    );
+
+    await user.click(screen.getByTestId(selectors.pages.Explore.toolbar.incidentWorkspaceButton));
+
+    const label = `${dateTime(2000).toISOString()} → ${dateTime(4000).toISOString()}`;
+    const track = screen.getByTestId(selectors.pages.Explore.General.incidentWorkspace).children[1] as HTMLElement;
+    // jsdom has no setPointerCapture; stub it so a regression reaches setRange.
+    track.setPointerCapture = () => {};
+
+    fireEvent.pointerDown(track, { clientX: 50, pointerId: 1 });
+
+    expect(screen.getByText(label)).toBeInTheDocument();
     expect(screen.queryByRole('slider', { name: /incident range start/i })).not.toBeInTheDocument();
   });
 

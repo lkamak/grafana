@@ -41,7 +41,9 @@ export function IncidentHighlight({ viewRange }: Props) {
   );
 
   const onPointerDown = (event: PointerEvent<HTMLElement>, target: IncidentDragTarget) => {
-    if (!range) {
+    // The track stays mounted when the incident misses this pane. A click would
+    // clamp that shared range into the current view and wipe it on both panes.
+    if (!range || !overlayOffsets(range, viewRange)) {
       return;
     }
     event.preventDefault();
