@@ -17,6 +17,7 @@ import { CorrelationEditorModeBar } from './CorrelationEditorModeBar';
 import { ExploreActions } from './ExploreActions';
 import { ExploreDrawer } from './ExploreDrawer';
 import { ExplorePaneContainer } from './ExplorePaneContainer';
+import { IncidentWorkspaceProvider } from './IncidentWorkspace/IncidentWorkspaceContext';
 import { useQueriesDrawerContext } from './QueriesDrawer/QueriesDrawerContext';
 import RichHistoryContainer from './RichHistory/RichHistoryContainer';
 import { useExplorePageContext } from './hooks/useExplorePageContext';
@@ -67,49 +68,51 @@ function ExplorePageContent(props: GrafanaRouteComponentProps<{}, ExploreQueryPa
 
   return (
     <Page layout={PageLayoutType.Custom}>
-      <div
-        className={cx(styles.pageScrollbarWrapper, {
-          [styles.correlationsEditorIndicator]: showCorrelationEditorBar,
-        })}
-      >
-        <h1 className="sr-only">
-          <Trans i18nKey="nav.explore.title">Explore</Trans>
-        </h1>
-        <ExploreActions />
-        {showCorrelationEditorBar && <CorrelationEditorModeBar panes={panes} />}
-        <SplitPaneWrapper
-          splitOrientation="vertical"
-          paneSize={widthCalc}
-          minSize={MIN_PANE_WIDTH}
-          maxSize={MIN_PANE_WIDTH * -1}
-          primary="second"
-          splitVisible={hasSplit}
-          parentStyle={showCorrelationEditorBar ? { height: `calc(100% - ${theme.spacing(6)}` } : {}} // button = 4, padding = 1 x 2
-          paneStyle={{ overflow: 'auto', display: 'flex', flexDirection: 'column' }}
-          onDragFinished={(size) => size && updateSplitSize(size)}
-        >
-          {panes.map(([exploreId, pane]) => {
-            return (
-              <ErrorBoundaryAlert boundaryName="explore-pane" key={exploreId} style="page">
-                {pane.initialized ? (
-                  <ExplorePaneContainer exploreId={exploreId} />
-                ) : (
-                  <LoadingPlaceholder text={t('explore.pane.loading-placeholder', 'Loading...')} />
-                )}
-              </ErrorBoundaryAlert>
-            );
+      <IncidentWorkspaceProvider>
+        <div
+          className={cx(styles.pageScrollbarWrapper, {
+            [styles.correlationsEditorIndicator]: showCorrelationEditorBar,
           })}
-        </SplitPaneWrapper>
-        {drawerOpened && (
-          <ExploreDrawer>
-            <RichHistoryContainer
-              onClose={() => {
-                setDrawerOpened(false);
-              }}
-            />
-          </ExploreDrawer>
-        )}
-      </div>
+        >
+          <h1 className="sr-only">
+            <Trans i18nKey="nav.explore.title">Explore</Trans>
+          </h1>
+          <ExploreActions />
+          {showCorrelationEditorBar && <CorrelationEditorModeBar panes={panes} />}
+          <SplitPaneWrapper
+            splitOrientation="vertical"
+            paneSize={widthCalc}
+            minSize={MIN_PANE_WIDTH}
+            maxSize={MIN_PANE_WIDTH * -1}
+            primary="second"
+            splitVisible={hasSplit}
+            parentStyle={showCorrelationEditorBar ? { height: `calc(100% - ${theme.spacing(6)}` } : {}} // button = 4, padding = 1 x 2
+            paneStyle={{ overflow: 'auto', display: 'flex', flexDirection: 'column' }}
+            onDragFinished={(size) => size && updateSplitSize(size)}
+          >
+            {panes.map(([exploreId, pane]) => {
+              return (
+                <ErrorBoundaryAlert boundaryName="explore-pane" key={exploreId} style="page">
+                  {pane.initialized ? (
+                    <ExplorePaneContainer exploreId={exploreId} />
+                  ) : (
+                    <LoadingPlaceholder text={t('explore.pane.loading-placeholder', 'Loading...')} />
+                  )}
+                </ErrorBoundaryAlert>
+              );
+            })}
+          </SplitPaneWrapper>
+          {drawerOpened && (
+            <ExploreDrawer>
+              <RichHistoryContainer
+                onClose={() => {
+                  setDrawerOpened(false);
+                }}
+              />
+            </ExploreDrawer>
+          )}
+        </div>
+      </IncidentWorkspaceProvider>
     </Page>
   );
 }

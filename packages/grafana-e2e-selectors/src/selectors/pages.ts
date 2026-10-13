@@ -1021,6 +1021,9 @@ export const versionedPages = {
       addFromQueryLibrary: {
         '11.5.0': 'data-testid explore add from query library button',
       },
+      incidentWorkspace: {
+        '13.2.0': 'data-testid explore-incident-workspace',
+      },
     },
     toolbar: {
       bar: {
@@ -1049,6 +1052,9 @@ export const versionedPages = {
       },
       refreshPicker: {
         '12.4.0': 'data-testid explore-toolbar-refresh-picker',
+      },
+      incidentWorkspaceButton: {
+        '13.2.0': 'data-testid explore-toolbar-incident-workspace-button',
       },
       add: {
         '12.4.0': (key: string) => `data-testid explore-toolbar-add-button ${key}`,

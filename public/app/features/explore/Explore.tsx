@@ -44,6 +44,7 @@ import { CustomContainer } from './CustomContainer';
 import { ExploreToolbar } from './ExploreToolbar';
 import { FlameGraphExploreContainer } from './FlameGraph/FlameGraphExploreContainer';
 import { GraphContainer } from './Graph/GraphContainer';
+import { IncidentHighlight } from './IncidentWorkspace/IncidentHighlight';
 import LogsContainer from './Logs/LogsContainer';
 import { LogsSamplePanel } from './Logs/LogsSamplePanel';
 import { NoData } from './NoData';
@@ -741,6 +742,12 @@ export class Explore extends PureComponent<Props, ExploreState> {
 
                         return (
                           <main className={cx(styles.exploreMain)} style={{ width }}>
+                            <IncidentHighlight
+                              viewRange={{
+                                from: queryResponse.timeRange.from.valueOf(),
+                                to: queryResponse.timeRange.to.valueOf(),
+                              }}
+                            />
                             <ErrorBoundaryAlert boundaryName="explore-main">
                               {showPanels && (
                                 <>
