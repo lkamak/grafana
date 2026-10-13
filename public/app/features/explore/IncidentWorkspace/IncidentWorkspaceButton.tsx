@@ -37,7 +37,10 @@ export function IncidentWorkspaceButton({ exploreId, viewRange }: Props) {
       tooltip={
         active
           ? t('explore.incident-workspace.exit-tooltip', 'Leave incident workspace')
-          : t('explore.incident-workspace.enter-tooltip', 'Lock split panes to one time range and highlight an incident')
+          : t(
+              'explore.incident-workspace.enter-tooltip',
+              'Lock split panes to one time range and highlight an incident'
+            )
       }
       onClick={onClick}
       aria-pressed={active}
