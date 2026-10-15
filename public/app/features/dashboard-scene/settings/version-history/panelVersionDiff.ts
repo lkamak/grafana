@@ -96,7 +96,18 @@ function serializeV1Queries(targets: unknown): string {
     targets.map((target) => {
       if (target && typeof target === 'object') {
         const t = target as JsonObject;
-        return { refId: t.refId, expr: t.expr, query: t.query, rawSql: t.rawSql };
+        // v2 stores the target, minus refId/hide/datasource, on the DataQuery spec.
+        // Dropping the rest makes CloudWatch, TestData, and Azure Monitor look changed
+        // after schema migration: comparison falls back to that payload when expr,
+        // query, and rawSql are empty. hide and datasource are not part of the spec.
+        const serialized: JsonObject = {};
+        for (const key of Object.keys(t)) {
+          if (key === 'hide' || key === 'datasource' || t[key] === undefined) {
+            continue;
+          }
+          serialized[key] = t[key];
+        }
+        return serialized;
       }
       return target;
     })

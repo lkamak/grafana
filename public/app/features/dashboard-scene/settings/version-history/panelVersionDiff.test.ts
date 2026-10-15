@@ -1006,6 +1006,44 @@ describe('computeVisualPanelVersionDiff', () => {
       }),
     ]);
   });
+
+  it('treats equivalent v1 and v2 non-text queries as unchanged', () => {
+    const cloudwatch = { namespace: 'AWS/EC2', metricName: 'CPUUtilization' };
+    const v1Cloudwatch = v1QueryDashboard({
+      ...cloudwatch,
+      hide: false,
+      datasource: { type: 'cloudwatch', uid: 'cw' },
+    });
+    const same = computeVisualPanelVersionDiff(v1Cloudwatch, v2QueryDashboard(cloudwatch));
+    expect(same.tabs[0].panels[0].status).toBe('unchanged');
+    expect(same.tabs[0].panels[0].fieldChanges.find((change) => change.field === 'query')).toBeUndefined();
+
+    const changed = computeVisualPanelVersionDiff(
+      v1Cloudwatch,
+      v2QueryDashboard({ metricName: 'MemoryUtilization', namespace: 'AWS/EC2' })
+    );
+    expect(changed.tabs[0].panels[0].status).toBe('changed');
+    expect(changed.tabs[0].panels[0].fieldChanges).toEqual([
+      expect.objectContaining({
+        field: 'query',
+        before: 'A: metricName=CPUUtilization, namespace=AWS/EC2',
+        after: 'A: metricName=MemoryUtilization, namespace=AWS/EC2',
+      }),
+    ]);
+
+    expect(
+      computeVisualPanelVersionDiff(
+        v1QueryDashboard({ scenarioId: 'random_walk' }),
+        v2QueryDashboard({ scenarioId: 'random_walk' })
+      ).tabs[0].panels[0].status
+    ).toBe('unchanged');
+    expect(
+      computeVisualPanelVersionDiff(
+        v1QueryDashboard({ azureMonitor: { resourceGroup: 'rg' } }),
+        v2QueryDashboard({ azureMonitor: { resourceGroup: 'rg' } })
+      ).tabs[0].panels[0].status
+    ).toBe('unchanged');
+  });
 });
 
 function v1QueryDashboard(target: Record<string, unknown>) {
