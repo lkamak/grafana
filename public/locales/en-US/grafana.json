@@ -7721,6 +7721,24 @@
       "updated-by": "Updated by",
       "version": "Version"
     },
+    "version-history-visual": {
+      "default-tab": "Dashboard",
+      "field-library-panel": "Library panel",
+      "field-position": "Position",
+      "field-query": "Query",
+      "field-thresholds": "Thresholds",
+      "field-title": "Title",
+      "field-viz-type": "Visualization",
+      "no-field-changes": "No field changes for this panel.",
+      "no-panels": "No panels to compare in this dashboard version pair.",
+      "status-added": "Added",
+      "status-changed": "Changed",
+      "status-moved": "Moved",
+      "status-removed": "Removed",
+      "status-unchanged": "Unchanged",
+      "title": "Visual panel diff",
+      "untitled-panel": "Untitled panel"
+    },
     "versions-history-buttons": {
       "compare-versions": "Compare versions",
       "content-select-two-versions-to-start-comparing": "Select two versions to start comparing",
