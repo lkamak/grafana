@@ -682,6 +682,18 @@ export const versionedPages = {
           },
         },
       },
+      VersionHistory: {
+        visualDiffCanvas: {
+          '13.2.0': 'data-testid dashboard version history visual diff canvas',
+        },
+        visualDiffTab: {
+          '13.2.0': (tabTitle: string) => `data-testid dashboard version history visual diff tab ${tabTitle}`,
+        },
+        visualDiffPanel: {
+          '13.2.0': (panelId: string | number) =>
+            `data-testid dashboard version history visual diff panel ${panelId}`,
+        },
+      },
     },
     Annotations: {
       tooltip: {
