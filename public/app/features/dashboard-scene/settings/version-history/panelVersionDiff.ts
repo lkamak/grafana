@@ -514,10 +514,77 @@ export function formatThresholdsForDisplay(serialized: string): string {
   }
 }
 
+const QUERY_TEXT_KEYS = ['expr', 'query', 'rawSql'] as const;
+
+// v1 stores expr/query/rawSql as strings. v2 stores those same fields under a DataQueryKind.
+// Compare the text, not the schema wrapper, so a pre-migration snapshot matches its v2 revision.
+function queryTextFields(value: unknown, depth = 0): Partial<Record<(typeof QUERY_TEXT_KEYS)[number], string>> {
+  if (!value || typeof value !== 'object' || depth > 3) {
+    return {};
+  }
+
+  const obj = value as JsonObject;
+  const fields = obj.spec && typeof obj.spec === 'object' ? (obj.spec as JsonObject) : obj;
+  const result: Partial<Record<(typeof QUERY_TEXT_KEYS)[number], string>> = {};
+
+  for (const key of QUERY_TEXT_KEYS) {
+    const field = fields[key];
+    if (typeof field === 'string' || typeof field === 'number' || typeof field === 'boolean') {
+      if (field !== '') {
+        result[key] = String(field);
+      }
+      continue;
+    }
+    if (field && typeof field === 'object') {
+      const nested = queryTextFields(field, depth + 1);
+      for (const nestedKey of QUERY_TEXT_KEYS) {
+        if (nested[nestedKey] && !result[nestedKey]) {
+          result[nestedKey] = nested[nestedKey];
+        }
+      }
+    }
+  }
+
+  return result;
+}
+
+function comparableQueries(serialized: string): string {
+  if (!serialized) {
+    return '';
+  }
+  try {
+    const parsed = JSON.parse(serialized) as unknown;
+    if (!Array.isArray(parsed)) {
+      return serialized;
+    }
+    return JSON.stringify(
+      parsed.map((raw) => {
+        if (!raw || typeof raw !== 'object') {
+          return raw;
+        }
+        const query = raw as JsonObject;
+        const text = queryTextFields(query);
+        return {
+          refId: query.refId ?? null,
+          expr: text.expr ?? '',
+          query: text.query ?? '',
+          rawSql: text.rawSql ?? '',
+        };
+      })
+    );
+  } catch {
+    return serialized;
+  }
+}
+
+function queriesEqual(left: string, right: string): boolean {
+  return left === right || comparableQueries(left) === comparableQueries(right);
+}
+
 function fieldsEqual(a: NormalizedPanel, b: NormalizedPanel): boolean {
   return (
     a.title === b.title &&
-    a.queries === b.queries &&
+    queriesEqual(a.queries, b.queries) &&
     a.vizType === b.vizType &&
     a.thresholds === b.thresholds &&
     a.libraryPanelUid === b.libraryPanelUid
@@ -543,7 +610,7 @@ function buildFieldChanges(base: NormalizedPanel, current: NormalizedPanel): Pan
   if (base.title !== current.title) {
     changes.push({ field: 'title', before: base.title, after: current.title });
   }
-  if (base.queries !== current.queries) {
+  if (!queriesEqual(base.queries, current.queries)) {
     changes.push({
       field: 'query',
       before: formatQueriesForDisplay(base.queries),
@@ -645,14 +712,14 @@ export function computeVisualPanelVersionDiff(baseData: object, newData: object)
   const newTabs = extractPanelsByTab(newData);
 
   const tabIds = mergeTabOrder(baseTabs, newTabs);
-  const hasTabs = tabIds.some((id) => id !== DEFAULT_TAB_ID);
 
   const tabs: TabPanelDiff[] = [];
 
   for (const tabId of tabIds) {
     const baseTab = baseTabs.get(tabId);
     const newTab = newTabs.get(tabId);
-    const tabTitle = newTab?.tabTitle || baseTab?.tabTitle || tabId;
+    // Keep an empty title empty. Falling back to tabId shows "__default__" or "tab-0" in the picker.
+    const tabTitle = newTab?.tabTitle || baseTab?.tabTitle || '';
     const titlePath = newTab?.titlePath?.length
       ? newTab.titlePath
       : baseTab?.titlePath?.length
@@ -688,9 +755,17 @@ export function computeVisualPanelVersionDiff(baseData: object, newData: object)
     tabs.push({ tabId, tabTitle, titlePath, panels });
   }
 
-  return { hasTabs, tabs };
+  // An empty snapshot still contributes a placeholder tab, and merge order lists the newer
+  // snapshot first. Drop that placeholder when another tab has panels so it cannot hide them.
+  const hasPanelDiffs = tabs.some((tab) => tab.panels.length > 0);
+  const visibleTabs = hasPanelDiffs ? tabs.filter((tab) => tab.panels.length > 0) : tabs;
+
+  return {
+    hasTabs: visibleTabs.some((tab) => tab.tabId !== DEFAULT_TAB_ID),
+    tabs: visibleTabs,
+  };
 }
 
 export function getDefaultTabId(diff: VisualPanelVersionDiff): string {
-  return diff.tabs[0]?.tabId ?? DEFAULT_TAB_ID;
+  return diff.tabs.find((tab) => tab.panels.length > 0)?.tabId ?? diff.tabs[0]?.tabId ?? DEFAULT_TAB_ID;
 }

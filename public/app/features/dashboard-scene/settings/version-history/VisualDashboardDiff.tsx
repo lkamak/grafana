@@ -40,17 +40,14 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
     };
   });
 
-  if (!activeTab || activeTab.panels.length === 0) {
-    return (
-      <Text variant="bodySmall" color="secondary">
-        <Trans i18nKey="dashboard-scene.version-history-visual.no-panels">
-          No panels to compare in this dashboard version pair.
-        </Trans>
-      </Text>
-    );
+  const activePanels = activeTab?.panels ?? [];
+  const showTabPicker = diff.hasTabs && tabOptions.length > 1;
+  // An empty tab must not replace the picker, or there is no way back to tabs that have panels.
+  if (activePanels.length === 0 && !showTabPicker) {
+    return <NoPanelsMessage />;
   }
 
-  const { stacks, flowing } = groupGridTiles(activeTab.panels);
+  const { stacks, flowing } = groupGridTiles(activePanels);
 
   return (
     <Stack direction="column" gap={2}>
@@ -67,7 +64,7 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
         </Stack>
       </Stack>
 
-      {diff.hasTabs && tabOptions.length > 1 && (
+      {showTabPicker && (
         <RadioButtonGroup
           options={tabOptions}
           value={selectedTabId}
@@ -75,63 +72,77 @@ export function VisualDashboardDiff({ baseData, newData }: VisualDashboardDiffPr
         />
       )}
 
-      <div className={styles.canvas} data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffCanvas}>
-        {activeTab.panels.map((entry) => {
-          const movedPosition = entry.fieldChanges.some((change) => change.field === 'position');
-          const ghostPos =
-            (entry.status === 'moved' || (entry.status === 'changed' && movedPosition)) && entry.base?.gridPos
-              ? entry.base.gridPos
-              : undefined;
-          if (ghostPos) {
-            return <PanelGhostTile key={`ghost-${entry.id}`} gridPos={ghostPos} styles={styles} />;
-          }
-          return null;
-        })}
-        {stacks.map(({ gridPos, entries }) => {
-          if (entries.length === 1) {
-            return (
-              <PanelDiffTile
-                key={String(entries[0].id)}
-                entry={entries[0]}
-                styles={styles}
-                onSelect={() => setSelectedPanel(entries[0])}
-              />
-            );
-          }
-
-          return (
-            <div
-              key={`stack-${gridPos.x}-${gridPos.y}-${gridPos.w}-${gridPos.h}`}
-              className={styles.tileStack}
-              style={{
-                gridColumn: `${gridPos.x + 1} / span ${gridPos.w}`,
-                gridRow: `${gridPos.y + 1} / span ${gridPos.h}`,
-              }}
-            >
-              {entries.map((entry) => (
+      {activePanels.length === 0 ? (
+        <NoPanelsMessage />
+      ) : (
+        <div className={styles.canvas} data-testid={selectors.pages.Dashboard.Settings.VersionHistory.visualDiffCanvas}>
+          {activePanels.map((entry) => {
+            const movedPosition = entry.fieldChanges.some((change) => change.field === 'position');
+            const ghostPos =
+              (entry.status === 'moved' || (entry.status === 'changed' && movedPosition)) && entry.base?.gridPos
+                ? entry.base.gridPos
+                : undefined;
+            if (ghostPos) {
+              return <PanelGhostTile key={`ghost-${entry.id}`} gridPos={ghostPos} styles={styles} />;
+            }
+            return null;
+          })}
+          {stacks.map(({ gridPos, entries }) => {
+            if (entries.length === 1) {
+              return (
                 <PanelDiffTile
-                  key={String(entry.id)}
-                  entry={entry}
+                  key={String(entries[0].id)}
+                  entry={entries[0]}
                   styles={styles}
-                  stacked
-                  onSelect={() => setSelectedPanel(entry)}
+                  onSelect={() => setSelectedPanel(entries[0])}
                 />
-              ))}
-            </div>
-          );
-        })}
-        {flowing.map((entry) => (
-          <PanelDiffTile
-            key={String(entry.id)}
-            entry={entry}
-            styles={styles}
-            onSelect={() => setSelectedPanel(entry)}
-          />
-        ))}
-      </div>
+              );
+            }
+
+            return (
+              <div
+                key={`stack-${gridPos.x}-${gridPos.y}-${gridPos.w}-${gridPos.h}`}
+                className={styles.tileStack}
+                style={{
+                  gridColumn: `${gridPos.x + 1} / span ${gridPos.w}`,
+                  gridRow: `${gridPos.y + 1} / span ${gridPos.h}`,
+                }}
+              >
+                {entries.map((entry) => (
+                  <PanelDiffTile
+                    key={String(entry.id)}
+                    entry={entry}
+                    styles={styles}
+                    stacked
+                    onSelect={() => setSelectedPanel(entry)}
+                  />
+                ))}
+              </div>
+            );
+          })}
+          {flowing.map((entry) => (
+            <PanelDiffTile
+              key={String(entry.id)}
+              entry={entry}
+              styles={styles}
+              onSelect={() => setSelectedPanel(entry)}
+            />
+          ))}
+        </div>
+      )}
 
       {selectedPanel && <PanelDetailDrawer entry={selectedPanel} onClose={() => setSelectedPanel(null)} />}
     </Stack>
+  );
+}
+
+function NoPanelsMessage() {
+  return (
+    <Text variant="bodySmall" color="secondary">
+      <Trans i18nKey="dashboard-scene.version-history-visual.no-panels">
+        No panels to compare in this dashboard version pair.
+      </Trans>
+    </Text>
   );
 }
 

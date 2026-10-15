@@ -1,4 +1,9 @@
-import { computeVisualPanelVersionDiff, formatQueriesForDisplay, formatThresholdsForDisplay } from './panelVersionDiff';
+import {
+  computeVisualPanelVersionDiff,
+  formatQueriesForDisplay,
+  formatThresholdsForDisplay,
+  getDefaultTabId,
+} from './panelVersionDiff';
 
 describe('computeVisualPanelVersionDiff', () => {
   it('classifies v1 panel add, remove, change, and move', () => {
@@ -773,7 +778,334 @@ describe('computeVisualPanelVersionDiff', () => {
     expect(thresholdChange?.before).toBe('—');
     expect(thresholdChange?.after).toBe('absolute: 0=green');
   });
+
+  it('shows panels from a tabbed version when the other version is empty', () => {
+    const tabbed = {
+      layout: {
+        kind: 'TabsLayout',
+        spec: {
+          tabs: [
+            {
+              kind: 'TabsLayoutTab',
+              spec: {
+                title: 'Overview',
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [
+                      {
+                        kind: 'GridLayoutItem',
+                        spec: {
+                          x: 0,
+                          y: 0,
+                          width: 12,
+                          height: 8,
+                          element: { kind: 'ElementReference', name: 'panel-a' },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      elements: {
+        'panel-a': {
+          kind: 'Panel',
+          spec: {
+            id: 10,
+            title: 'Overview panel',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'timeseries',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+      },
+    };
+
+    const diff = computeVisualPanelVersionDiff(tabbed, { panels: [] });
+
+    expect(diff.tabs.every((tab) => tab.panels.length > 0)).toBe(true);
+    expect(diff.tabs.find((tab) => tab.tabId === '__default__')).toBeUndefined();
+    expect(getDefaultTabId(diff)).toBe(diff.tabs[0].tabId);
+    expect(diff.tabs[0].panels[0].status).toBe('removed');
+  });
+
+  it('keeps an empty default tab only when neither version has panels', () => {
+    const diff = computeVisualPanelVersionDiff({ panels: [] }, { panels: [] });
+
+    expect(diff.tabs).toHaveLength(1);
+    expect(diff.tabs[0].tabId).toBe('__default__');
+    expect(diff.tabs[0].panels).toHaveLength(0);
+    expect(getDefaultTabId(diff)).toBe('__default__');
+  });
+
+  it('leaves the default group title empty so the picker can label it', () => {
+    const dashboard = {
+      layout: {
+        kind: 'RowsLayout',
+        spec: {
+          rows: [
+            {
+              kind: 'RowsLayoutRow',
+              spec: {
+                title: 'Row',
+                layout: {
+                  kind: 'TabsLayout',
+                  spec: {
+                    tabs: [
+                      {
+                        kind: 'TabsLayoutTab',
+                        spec: {
+                          title: 'Overview',
+                          layout: {
+                            kind: 'GridLayout',
+                            spec: {
+                              items: [
+                                {
+                                  kind: 'GridLayoutItem',
+                                  spec: {
+                                    x: 0,
+                                    y: 0,
+                                    width: 12,
+                                    height: 8,
+                                    element: { kind: 'ElementReference', name: 'panel-a' },
+                                  },
+                                },
+                              ],
+                            },
+                          },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+            {
+              kind: 'RowsLayoutRow',
+              spec: {
+                title: 'Loose',
+                layout: {
+                  kind: 'GridLayout',
+                  spec: {
+                    items: [
+                      {
+                        kind: 'GridLayoutItem',
+                        spec: {
+                          x: 0,
+                          y: 0,
+                          width: 12,
+                          height: 8,
+                          element: { kind: 'ElementReference', name: 'panel-b' },
+                        },
+                      },
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+      elements: {
+        'panel-a': {
+          kind: 'Panel',
+          spec: {
+            id: 1,
+            title: 'Tabbed',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+        'panel-b': {
+          kind: 'Panel',
+          spec: {
+            id: 2,
+            title: 'Loose',
+            data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+            vizConfig: {
+              kind: 'VizConfig',
+              group: 'stat',
+              version: '1',
+              spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+            },
+          },
+        },
+      },
+    };
+
+    const diff = computeVisualPanelVersionDiff(dashboard, dashboard);
+    const defaultTab = diff.tabs.find((tab) => tab.tabId === '__default__');
+    const untitled = computeVisualPanelVersionDiff(untitledTabDashboard(), untitledTabDashboard());
+
+    expect(defaultTab?.tabTitle).toBe('');
+    expect(defaultTab?.panels.map((panel) => panel.id)).toEqual([2]);
+    expect(untitled.tabs[0].tabId).toBe('tab-0');
+    expect(untitled.tabs[0].tabTitle).toBe('');
+  });
+
+  it('treats equivalent v1 and v2 queries as unchanged', () => {
+    const same = computeVisualPanelVersionDiff(
+      v1QueryDashboard({ expr: 'cpu', legendFormat: '{{instance}}' }),
+      v2QueryDashboard({ expr: 'cpu', legendFormat: '{{instance}}' })
+    );
+    expect(same.tabs[0].panels[0].status).toBe('unchanged');
+    expect(same.tabs[0].panels[0].fieldChanges.find((change) => change.field === 'query')).toBeUndefined();
+
+    expect(
+      computeVisualPanelVersionDiff(
+        v1QueryDashboard({ query: 'stats.gauges.*' }),
+        v2QueryDashboard({ query: 'stats.gauges.*' })
+      ).tabs[0].panels[0].status
+    ).toBe('unchanged');
+    expect(
+      computeVisualPanelVersionDiff(v1QueryDashboard({ rawSql: 'SELECT 1' }), v2QueryDashboard({ rawSql: 'SELECT 1' }))
+        .tabs[0].panels[0].status
+    ).toBe('unchanged');
+
+    const changed = computeVisualPanelVersionDiff(
+      v1QueryDashboard({ expr: 'cpu' }),
+      v2QueryDashboard({ expr: 'cpu_usage' })
+    );
+    expect(changed.tabs[0].panels[0].status).toBe('changed');
+    expect(changed.tabs[0].panels[0].fieldChanges).toEqual([
+      expect.objectContaining({ field: 'query', before: 'A: cpu', after: 'A: cpu_usage' }),
+    ]);
+  });
 });
+
+function v1QueryDashboard(target: Record<string, unknown>) {
+  return {
+    panels: [
+      {
+        id: 1,
+        type: 'timeseries',
+        title: 'CPU',
+        gridPos: { x: 0, y: 0, w: 12, h: 8 },
+        targets: [{ refId: 'A', ...target }],
+      },
+    ],
+  };
+}
+
+function v2QueryDashboard(querySpec: Record<string, unknown>) {
+  return {
+    layout: {
+      kind: 'GridLayout',
+      spec: {
+        items: [
+          {
+            kind: 'GridLayoutItem',
+            spec: {
+              x: 0,
+              y: 0,
+              width: 12,
+              height: 8,
+              element: { kind: 'ElementReference', name: 'panel-1' },
+            },
+          },
+        ],
+      },
+    },
+    elements: {
+      'panel-1': {
+        kind: 'Panel',
+        spec: {
+          id: 1,
+          title: 'CPU',
+          data: {
+            kind: 'QueryGroup',
+            spec: {
+              queries: [
+                {
+                  kind: 'PanelQuery',
+                  spec: {
+                    refId: 'A',
+                    query: {
+                      kind: 'DataQuery',
+                      group: 'prometheus',
+                      version: 'v0',
+                      spec: querySpec,
+                    },
+                  },
+                },
+              ],
+            },
+          },
+          vizConfig: {
+            kind: 'VizConfig',
+            group: 'timeseries',
+            version: '1',
+            spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+          },
+        },
+      },
+    },
+  };
+}
+
+function untitledTabDashboard() {
+  return {
+    layout: {
+      kind: 'TabsLayout',
+      spec: {
+        tabs: [
+          {
+            kind: 'TabsLayoutTab',
+            spec: {
+              title: '',
+              layout: {
+                kind: 'GridLayout',
+                spec: {
+                  items: [
+                    {
+                      kind: 'GridLayoutItem',
+                      spec: {
+                        x: 0,
+                        y: 0,
+                        width: 12,
+                        height: 8,
+                        element: { kind: 'ElementReference', name: 'panel-a' },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+    elements: {
+      'panel-a': {
+        kind: 'Panel',
+        spec: {
+          id: 1,
+          title: 'Untitled tab panel',
+          data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+          vizConfig: {
+            kind: 'VizConfig',
+            group: 'stat',
+            version: '1',
+            spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+          },
+        },
+      },
+    },
+  };
+}
 
 describe('formatQueriesForDisplay', () => {
   it('returns em dash for empty serialized queries', () => {

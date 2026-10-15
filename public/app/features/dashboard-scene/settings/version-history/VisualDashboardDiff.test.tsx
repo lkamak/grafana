@@ -339,4 +339,141 @@ describe('VisualDashboardDiff', () => {
     await user.click(added);
     expect(await screen.findByRole('dialog', { name: /New panel/i })).toBeInTheDocument();
   });
+
+  it('shows removed panels and keeps the tab picker when the newer version has no panels', async () => {
+    const user = userEvent.setup();
+    renderDiff(tabbedDashboard(), { panels: [] });
+
+    expect(screen.queryByText('No panels to compare in this dashboard version pair.')).not.toBeInTheDocument();
+    expect(
+      await screen.findByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(10))
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: '__default__' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Details' }));
+
+    expect(
+      await screen.findByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(11))
+    ).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Overview' })).toBeInTheDocument();
+  });
+
+  it('labels the non-tab panel group Dashboard instead of the internal tab id', async () => {
+    const user = userEvent.setup();
+    renderDiff(mixedRowsAndTabsDashboard(), mixedRowsAndTabsDashboard());
+
+    expect(await screen.findByRole('radio', { name: 'Dashboard' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Overview' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: '__default__' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'row-0/tab-0' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('radio', { name: 'Dashboard' }));
+
+    expect(
+      await screen.findByTestId(selectors.pages.Dashboard.Settings.VersionHistory.visualDiffPanel(2))
+    ).toBeInTheDocument();
+  });
 });
+
+function v2Panel(id: number, title: string) {
+  return {
+    kind: 'Panel',
+    spec: {
+      id,
+      title,
+      data: { kind: 'QueryGroup', spec: { queries: [], transformations: [], queryOptions: {} } },
+      vizConfig: {
+        kind: 'VizConfig',
+        group: 'timeseries',
+        version: '1',
+        spec: { options: {}, fieldConfig: { defaults: {}, overrides: [] } },
+      },
+    },
+  };
+}
+
+function gridItem(name: string) {
+  return {
+    kind: 'GridLayoutItem',
+    spec: {
+      x: 0,
+      y: 0,
+      width: 12,
+      height: 8,
+      element: { kind: 'ElementReference', name },
+    },
+  };
+}
+
+function tabbedDashboard() {
+  return {
+    layout: {
+      kind: 'TabsLayout',
+      spec: {
+        tabs: [
+          {
+            kind: 'TabsLayoutTab',
+            spec: {
+              title: 'Overview',
+              layout: { kind: 'GridLayout', spec: { items: [gridItem('panel-a')] } },
+            },
+          },
+          {
+            kind: 'TabsLayoutTab',
+            spec: {
+              title: 'Details',
+              layout: { kind: 'GridLayout', spec: { items: [gridItem('panel-b')] } },
+            },
+          },
+        ],
+      },
+    },
+    elements: {
+      'panel-a': v2Panel(10, 'Overview panel'),
+      'panel-b': v2Panel(11, 'Details panel'),
+    },
+  };
+}
+
+function mixedRowsAndTabsDashboard() {
+  return {
+    layout: {
+      kind: 'RowsLayout',
+      spec: {
+        rows: [
+          {
+            kind: 'RowsLayoutRow',
+            spec: {
+              title: 'Row',
+              layout: {
+                kind: 'TabsLayout',
+                spec: {
+                  tabs: [
+                    {
+                      kind: 'TabsLayoutTab',
+                      spec: {
+                        title: 'Overview',
+                        layout: { kind: 'GridLayout', spec: { items: [gridItem('panel-a')] } },
+                      },
+                    },
+                  ],
+                },
+              },
+            },
+          },
+          {
+            kind: 'RowsLayoutRow',
+            spec: {
+              title: 'Loose',
+              layout: { kind: 'GridLayout', spec: { items: [gridItem('panel-b')] } },
+            },
+          },
+        ],
+      },
+    },
+    elements: {
+      'panel-a': v2Panel(1, 'Tabbed'),
+      'panel-b': v2Panel(2, 'Loose'),
+    },
+  };
+}
