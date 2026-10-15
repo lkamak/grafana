@@ -2,13 +2,13 @@ import { css, cx } from '@emotion/css';
 
 import { type GrafanaTheme2 } from '@grafana/data';
 import { Trans, t } from '@grafana/i18n';
-import { Button, ModalsController, CollapsableSection, useStyles2, Stack, Icon, Box } from '@grafana/ui';
+import { Alert, Button, ModalsController, CollapsableSection, useStyles2, Stack, Icon, Box } from '@grafana/ui';
 import { type DecoratedRevisionModel } from 'app/features/dashboard/types/revisionModels';
 
-import { DiffGroup } from './DiffGroup';
 import LazyDiffViewer from './LazyDiffViewer';
+import { PanelDiffVisualization } from './PanelDiffVisualization';
 import { RevertDashboardModal } from './RevertDashboardModal';
-import { jsonDiff } from './utils';
+import { diffDashboardPanels } from './panelDiff';
 
 type DiffViewProps = {
   isNewLatest: boolean;
@@ -19,7 +19,7 @@ type DiffViewProps = {
 };
 
 export const VersionHistoryComparison = ({ baseInfo, newInfo, diffData, isNewLatest, onRestore }: DiffViewProps) => {
-  const diff = jsonDiff(diffData.lhs, diffData.rhs);
+  const panelDiff = diffDashboardPanels(diffData.lhs, diffData.rhs);
   const styles = useStyles2(getStyles);
 
   return (
@@ -72,9 +72,22 @@ export const VersionHistoryComparison = ({ baseInfo, newInfo, diffData, isNewLat
         )}
       </Stack>
 
-      {Object.entries(diff).map(([key, diffs]) => (
-        <DiffGroup diffs={diffs} key={key} title={key} />
-      ))}
+      {panelDiff.mode === 'visual' ? (
+        <PanelDiffVisualization diff={panelDiff} />
+      ) : (
+        <Alert
+          severity="info"
+          title={t(
+            'dashboard-scene.version-history-comparison.schema-mismatch-title',
+            'Visual diff unavailable for this comparison'
+          )}
+        >
+          {t(
+            'dashboard-scene.version-history-comparison.schema-mismatch-body',
+            'These two versions use different dashboard schemas. Use the JSON diff below to inspect changes.'
+          )}
+        </Alert>
+      )}
 
       <Box paddingTop={2}>
         <CollapsableSection
