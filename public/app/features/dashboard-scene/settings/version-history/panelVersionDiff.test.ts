@@ -984,6 +984,28 @@ describe('computeVisualPanelVersionDiff', () => {
       expect.objectContaining({ field: 'query', before: 'A: cpu', after: 'A: cpu_usage' }),
     ]);
   });
+
+  it('detects v2 query changes stored outside expr, query, and rawSql', () => {
+    const base = v2QueryDashboard({ metricName: 'CPUUtilization', namespace: 'AWS/EC2' });
+    const same = computeVisualPanelVersionDiff(
+      base,
+      v2QueryDashboard({ namespace: 'AWS/EC2', metricName: 'CPUUtilization' })
+    );
+    expect(same.tabs[0].panels[0].status).toBe('unchanged');
+
+    const changed = computeVisualPanelVersionDiff(
+      base,
+      v2QueryDashboard({ metricName: 'MemoryUtilization', namespace: 'AWS/EC2' })
+    );
+    expect(changed.tabs[0].panels[0].status).toBe('changed');
+    expect(changed.tabs[0].panels[0].fieldChanges).toEqual([
+      expect.objectContaining({
+        field: 'query',
+        before: 'A: metricName=CPUUtilization, namespace=AWS/EC2',
+        after: 'A: metricName=MemoryUtilization, namespace=AWS/EC2',
+      }),
+    ]);
+  });
 });
 
 function v1QueryDashboard(target: Record<string, unknown>) {
@@ -1135,6 +1157,20 @@ describe('formatQueriesForDisplay', () => {
     ]);
     expect(formatQueriesForDisplay(v2)).toBe('A: up; B: SELECT 1; C: stats.gauges.*');
     expect(formatQueriesForDisplay(v2)).not.toContain('[object Object]');
+    expect(
+      formatQueriesForDisplay(
+        JSON.stringify([
+          {
+            refId: 'A',
+            query: {
+              kind: 'DataQuery',
+              group: 'cloudwatch',
+              spec: { namespace: 'AWS/EC2', metricName: 'CPUUtilization' },
+            },
+          },
+        ])
+      )
+    ).toBe('A: metricName=CPUUtilization, namespace=AWS/EC2');
   });
 });
 

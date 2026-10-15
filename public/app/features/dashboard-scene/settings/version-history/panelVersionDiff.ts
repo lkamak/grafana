@@ -445,6 +445,7 @@ function formatGridPos(pos?: GridPos, autoGridIndex?: number): string {
 
 // v1 queries store expr/query/rawSql as strings. v2 stores a DataQueryKind on `query`
 // (kind/group/spec); the expression lives under spec and must not be stringified as an object.
+// Specs with no text field still need a summary, or the drawer shows the same refId on both sides.
 function queryDisplayText(value: unknown, depth = 0): string {
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return String(value);
@@ -459,7 +460,20 @@ function queryDisplayText(value: unknown, depth = 0): string {
   if (text && typeof text === 'object') {
     return queryDisplayText(text, depth + 1);
   }
-  return text != null && text !== '' ? String(text) : '';
+  if (text != null && text !== '') {
+    return String(text);
+  }
+
+  const payload = nonTextQueryPayload(value);
+  if (!payload || typeof payload !== 'object') {
+    return '';
+  }
+  return Object.entries(payload as JsonObject)
+    .map(([key, field]) => {
+      const rendered = field !== null && typeof field === 'object' ? JSON.stringify(field) : String(field);
+      return `${key}=${rendered}`;
+    })
+    .join(', ');
 }
 
 export function formatQueriesForDisplay(serialized: string): string {
@@ -515,9 +529,12 @@ export function formatThresholdsForDisplay(serialized: string): string {
 }
 
 const QUERY_TEXT_KEYS = ['expr', 'query', 'rawSql'] as const;
+const QUERY_WRAPPER_KEYS = new Set(['kind', 'group', 'version', 'datasource']);
 
 // v1 stores expr/query/rawSql as strings. v2 stores those same fields under a DataQueryKind.
 // Compare the text, not the schema wrapper, so a pre-migration snapshot matches its v2 revision.
+// When those keys are empty, keep the rest of the spec. CloudWatch, TestData, and Azure Monitor
+// identify the query with other fields, and dropping them makes different v2 queries compare equal.
 function queryTextFields(value: unknown, depth = 0): Partial<Record<(typeof QUERY_TEXT_KEYS)[number], string>> {
   if (!value || typeof value !== 'object' || depth > 3) {
     return {};
@@ -548,6 +565,42 @@ function queryTextFields(value: unknown, depth = 0): Partial<Record<(typeof QUER
   return result;
 }
 
+function isDataQueryKind(value: unknown): value is JsonObject {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+  const obj = value as JsonObject;
+  return obj.kind === 'DataQuery' || (!!obj.spec && typeof obj.spec === 'object' && !Array.isArray(obj.spec));
+}
+
+// Wrapper keys (kind/group/version/spec) are not part of the query. What remains is the
+// datasource payload v2 kept and the text-key projection dropped.
+function nonTextQueryPayload(value: unknown, depth = 0): unknown {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || depth > 4) {
+    return undefined;
+  }
+
+  const obj = value as JsonObject;
+  if (obj.spec && typeof obj.spec === 'object' && !Array.isArray(obj.spec)) {
+    return nonTextQueryPayload(obj.spec, depth + 1);
+  }
+  if (isDataQueryKind(obj.query)) {
+    return nonTextQueryPayload(obj.query, depth + 1);
+  }
+
+  const payload: JsonObject = {};
+  for (const key of Object.keys(obj).sort()) {
+    if (key === 'refId' || QUERY_WRAPPER_KEYS.has(key) || (QUERY_TEXT_KEYS as readonly string[]).includes(key)) {
+      continue;
+    }
+    const field = obj[key];
+    if (field !== undefined) {
+      payload[key] = field;
+    }
+  }
+  return Object.keys(payload).length > 0 ? payload : undefined;
+}
+
 function comparableQueries(serialized: string): string {
   if (!serialized) {
     return '';
@@ -564,12 +617,22 @@ function comparableQueries(serialized: string): string {
         }
         const query = raw as JsonObject;
         const text = queryTextFields(query);
-        return {
+        const expr = text.expr ?? '';
+        const queryText = text.query ?? '';
+        const rawSql = text.rawSql ?? '';
+        const comparable: JsonObject = {
           refId: query.refId ?? null,
-          expr: text.expr ?? '',
-          query: text.query ?? '',
-          rawSql: text.rawSql ?? '',
+          expr,
+          query: queryText,
+          rawSql,
         };
+        if (!expr && !queryText && !rawSql) {
+          const payload = nonTextQueryPayload(query);
+          if (payload !== undefined) {
+            comparable.payload = payload;
+          }
+        }
+        return comparable;
       })
     );
   } catch {
