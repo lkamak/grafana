@@ -75,13 +75,21 @@ export function diffDashboardPanels(lhs: object, rhs: object): DashboardPanelDif
 
   const hasTabs = lhsSections.some((s) => s.tab) || rhsSections.some((s) => s.tab);
 
-  const sectionKeys = new Set([...lhsSections.map((s) => s.key), ...rhsSections.map((s) => s.key)]);
   const lhsByKey = new Map(lhsSections.map((s) => [s.key, s]));
   const rhsByKey = new Map(rhsSections.map((s) => [s.key, s]));
 
+  // Follow the newer layout order; sections only in the older revision go after their previous neighbor there.
+  const sectionKeys = rhsSections.map((s) => s.key);
+  lhsSections.forEach((s, index) => {
+    if (!rhsByKey.has(s.key)) {
+      const prevIndex = index > 0 ? sectionKeys.indexOf(lhsSections[index - 1].key) : -1;
+      sectionKeys.splice(prevIndex + 1, 0, s.key);
+    }
+  });
+
   const sections: PanelDiffSection[] = [];
 
-  for (const key of [...sectionKeys].sort()) {
+  for (const key of sectionKeys) {
     const lhsSection = lhsByKey.get(key);
     const rhsSection = rhsByKey.get(key);
     const label = lhsSection?.label ?? rhsSection?.label ?? key;
