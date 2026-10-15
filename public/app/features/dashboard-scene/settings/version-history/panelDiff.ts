@@ -281,13 +281,17 @@ function walkV2Layout(
 
   if (kind === 'RowsLayout') {
     const rows = (layout.spec?.rows as LayoutNode[] | undefined) ?? [];
+    const titleCounts = new Map<string, number>();
     rows.forEach((row, index) => {
       const rowSpec = row.spec as { title?: string; layout?: LayoutNode } | undefined;
       const title = rowSpec?.title?.trim() || `Row ${index + 1}`;
+      // Key by title so reordered rows still match; suffix only disambiguates duplicate titles.
+      const occurrence = (titleCounts.get(title) ?? 0) + 1;
+      titleCounts.set(title, occurrence);
       const nested = rowSpec?.layout;
       if (nested) {
         walkV2Layout(nested, elements, sections, {
-          keyPrefix: `${ctx.keyPrefix}|row:${index}:${title}`,
+          keyPrefix: `${ctx.keyPrefix}|row:${title}${occurrence > 1 ? `#${occurrence}` : ''}`,
           label: title,
           kind: 'row',
           tab: ctx.tab,
