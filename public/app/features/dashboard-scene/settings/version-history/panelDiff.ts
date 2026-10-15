@@ -22,10 +22,13 @@ export type PanelDiffItem = {
   displayMode: 'grid' | 'stack';
 };
 
+export type PanelDiffTab = { key: string; label: string };
+
 export type PanelDiffSection = {
   key: string;
   label: string;
   kind: 'root' | 'tab' | 'row';
+  tab?: PanelDiffTab;
   displayMode: 'grid' | 'stack';
   items: PanelDiffItem[];
 };
@@ -52,6 +55,7 @@ type ExtractedSection = {
   key: string;
   label: string;
   kind: 'root' | 'tab' | 'row';
+  tab?: PanelDiffTab;
   displayMode: 'grid' | 'stack';
   panels: Map<string, PanelSnapshot>;
 };
@@ -69,8 +73,7 @@ export function diffDashboardPanels(lhs: object, rhs: object): DashboardPanelDif
   const lhsSections = lhsKind === 'v2' ? extractV2Sections(lhs) : extractV1Sections(lhs);
   const rhsSections = rhsKind === 'v2' ? extractV2Sections(rhs) : extractV1Sections(rhs);
 
-  const hasTabs =
-    lhsSections.some((s) => s.kind === 'tab') || rhsSections.some((s) => s.kind === 'tab');
+  const hasTabs = lhsSections.some((s) => s.tab) || rhsSections.some((s) => s.tab);
 
   const sectionKeys = new Set([...lhsSections.map((s) => s.key), ...rhsSections.map((s) => s.key)]);
   const lhsByKey = new Map(lhsSections.map((s) => [s.key, s]));
@@ -83,6 +86,7 @@ export function diffDashboardPanels(lhs: object, rhs: object): DashboardPanelDif
     const rhsSection = rhsByKey.get(key);
     const label = lhsSection?.label ?? rhsSection?.label ?? key;
     const kind = lhsSection?.kind ?? rhsSection?.kind ?? 'root';
+    const tab = lhsSection?.tab ?? rhsSection?.tab;
     const displayMode = lhsSection?.displayMode ?? rhsSection?.displayMode ?? 'grid';
 
     const lhsPanels = lhsSection?.panels ?? new Map<string, PanelSnapshot>();
@@ -153,7 +157,7 @@ export function diffDashboardPanels(lhs: object, rhs: object): DashboardPanelDif
     items.sort((a, b) => sortByGridPosition(a.position, b.position));
 
     if (items.length > 0) {
-      sections.push({ key, label, kind, displayMode, items });
+      sections.push({ key, label, kind, tab, displayMode, items });
     }
   }
 
@@ -240,6 +244,7 @@ type LayoutContext = {
   keyPrefix: string;
   label: string;
   kind: 'root' | 'tab' | 'row';
+  tab?: PanelDiffTab;
 };
 
 type LayoutNode = {
@@ -260,13 +265,14 @@ function walkV2Layout(
     tabs.forEach((tab, index) => {
       const tabSpec = tab.spec as { title?: string; layout?: LayoutNode } | undefined;
       const title = tabSpec?.title?.trim() || `Tab ${index + 1}`;
-      const tabKey = `tab:${index}:${title}`;
+      const tabKey = `${ctx.keyPrefix}|tab:${index}:${title}`;
       const nested = tabSpec?.layout;
       if (nested) {
         walkV2Layout(nested, elements, sections, {
           keyPrefix: tabKey,
           label: title,
           kind: 'tab',
+          tab: ctx.tab ?? { key: tabKey, label: title },
         });
       }
     });
@@ -281,9 +287,10 @@ function walkV2Layout(
       const nested = rowSpec?.layout;
       if (nested) {
         walkV2Layout(nested, elements, sections, {
-          keyPrefix: `${ctx.keyPrefix}|row:${title}`,
+          keyPrefix: `${ctx.keyPrefix}|row:${index}:${title}`,
           label: title,
           kind: 'row',
+          tab: ctx.tab,
         });
       }
     });
@@ -315,6 +322,7 @@ function walkV2Layout(
       key: sectionKey,
       label: ctx.label,
       kind: ctx.kind,
+      tab: ctx.tab,
       displayMode: kind === 'AutoGridLayout' ? 'stack' : 'grid',
       panels,
     });
@@ -374,6 +382,17 @@ function panelFromV2Element(
     return undefined;
   }
   const element = raw as { kind?: string; spec?: Record<string, unknown> };
+  if (element.kind === 'LibraryPanel') {
+    const libraryPanel = element.spec?.libraryPanel as { name?: string; uid?: string } | undefined;
+    return {
+      id: name,
+      title: String(element.spec?.title ?? ''),
+      vizType: `library panel: ${libraryPanel?.name || libraryPanel?.uid || ''}`,
+      queries: {},
+      position,
+      displayMode,
+    };
+  }
   if (element.kind !== 'Panel') {
     return undefined;
   }
@@ -421,9 +440,9 @@ function queriesFromV2Data(data: { spec?: { queries?: unknown[] } } | undefined)
     if (!q || typeof q !== 'object') {
       continue;
     }
-    const pq = q as { spec?: { refId?: string; query?: { spec?: unknown } } };
+    const pq = q as { spec?: { refId?: string } };
     const refId = String(pq.spec?.refId ?? 'A');
-    out[refId] = stableStringify(pq.spec?.query?.spec ?? pq.spec);
+    out[refId] = stableStringify(pq.spec);
   }
   return out;
 }
@@ -457,7 +476,7 @@ function diffPanelContent(base: PanelSnapshot, newer: PanelSnapshot): PanelField
       changes.push({
         field: 'query',
         label: `Query ${refId}`,
-        from: from ?? '(removed)',
+        from: from ?? '(added)',
         to: to ?? '(removed)',
       });
     }

@@ -10,6 +10,7 @@ import {
   type PanelDiffItem,
   type PanelDiffSection,
   type PanelDiffStatus,
+  type PanelDiffTab,
 } from './panelDiff';
 
 const GRID_COLUMNS = 24;
@@ -21,10 +22,15 @@ type Props = {
 
 export function PanelDiffVisualization({ diff }: Props) {
   const styles = useStyles2(getStyles);
-  const tabSections = useMemo(
-    () => diff.sections.filter((section) => section.kind === 'tab'),
-    [diff.sections]
-  );
+  const tabSections = useMemo(() => {
+    const tabs = new Map<string, PanelDiffTab>();
+    for (const section of diff.sections) {
+      if (section.tab && !tabs.has(section.tab.key)) {
+        tabs.set(section.tab.key, section.tab);
+      }
+    }
+    return [...tabs.values()];
+  }, [diff.sections]);
   const [selectedTabKey, setSelectedTabKey] = useState<string | undefined>(tabSections[0]?.key);
 
   const sectionsToRender = useMemo(() => {
@@ -35,9 +41,7 @@ export function PanelDiffVisualization({ diff }: Props) {
     if (!selected) {
       return [];
     }
-    return diff.sections.filter(
-      (section) => section.key === selected || section.key.startsWith(`${selected}|`)
-    );
+    return diff.sections.filter((section) => !section.tab || section.tab.key === selected);
   }, [diff.hasTabs, diff.sections, selectedTabKey, tabSections]);
 
   return (
@@ -141,11 +145,7 @@ function PanelDiffCard({ item }: { item: PanelDiffItem }) {
         tabIndex={canExpand ? 0 : undefined}
       >
         <div className={styles.cardHeader}>
-          <Badge
-            text={statusLabel}
-            color={badgeColor(item.status)}
-            data-testid={`panel-diff-badge-${item.id}`}
-          />
+          <Badge text={statusLabel} color={badgeColor(item.status)} data-testid={`panel-diff-badge-${item.id}`} />
           <span className={styles.vizType}>{item.vizType || t('panel-diff.unknown-viz', 'Unknown')}</span>
         </div>
         <div className={styles.cardTitle}>{item.title || t('panel-diff.untitled-panel', 'Untitled panel')}</div>
