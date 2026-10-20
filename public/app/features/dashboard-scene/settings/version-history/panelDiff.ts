@@ -286,16 +286,12 @@ function extractV1Panels(data: Record<string, unknown>): { grid: PanelSnapshot[]
   const panels = Array.isArray(data.panels) ? data.panels : [];
   const grid: PanelSnapshot[] = [];
   let currentRow = DEFAULT_ROW;
+  let rowOffsetY = 0;
 
-  for (const panel of panels) {
+  const pushPanel = (panel: unknown) => {
     if (!isRecord(panel)) {
-      continue;
+      return;
     }
-    if (panel.type === 'row') {
-      currentRow = typeof panel.title === 'string' && panel.title ? panel.title : 'Row';
-      continue;
-    }
-
     const gridPos = isRecord(panel.gridPos) ? panel.gridPos : {};
     const id = typeof panel.id === 'number' ? panel.id : 0;
     const fieldConfig =
@@ -308,13 +304,32 @@ function extractV1Panels(data: Record<string, unknown>): { grid: PanelSnapshot[]
       queries: extractQueryStringsFromV1(panel.targets),
       thresholdsSummary: formatThresholds(fieldConfig.thresholds),
       x: typeof gridPos.x === 'number' ? gridPos.x : 0,
-      y: typeof gridPos.y === 'number' ? gridPos.y : 0,
+      y: Math.max(0, (typeof gridPos.y === 'number' ? gridPos.y : 0) - rowOffsetY),
       w: typeof gridPos.w === 'number' ? gridPos.w : 1,
       h: typeof gridPos.h === 'number' ? gridPos.h : 1,
       tab: DEFAULT_TAB,
       row: currentRow,
       layoutKind: 'grid',
     });
+  };
+
+  for (const panel of panels) {
+    if (!isRecord(panel)) {
+      continue;
+    }
+    if (panel.type !== 'row') {
+      pushPanel(panel);
+      continue;
+    }
+
+    currentRow = typeof panel.title === 'string' && panel.title ? panel.title : 'Row';
+    const rowGridPos = isRecord(panel.gridPos) ? panel.gridPos : {};
+    rowOffsetY =
+      (typeof rowGridPos.y === 'number' ? rowGridPos.y : 0) + (typeof rowGridPos.h === 'number' ? rowGridPos.h : 1);
+    // Collapsed rows keep their children on the row itself instead of as following top-level panels.
+    if (Array.isArray(panel.panels)) {
+      panel.panels.forEach(pushPanel);
+    }
   }
 
   return { grid, autoGrid: [] };
@@ -483,7 +498,12 @@ export function computeVisualPanelDiff(lhs: unknown, rhs: unknown): VisualPanelD
   const baseAutoByTab = groupAutoGridByTab(base.autoGrid);
   const newAutoByTab = groupAutoGridByTab(newer.autoGrid);
 
-  const tabTitles = new Set<string>([...baseGrouped.keys(), ...newGrouped.keys()]);
+  const tabTitles = new Set<string>([
+    ...baseGrouped.keys(),
+    ...newGrouped.keys(),
+    ...baseAutoByTab.keys(),
+    ...newAutoByTab.keys(),
+  ]);
   const sortedTabs = [...tabTitles].sort((a, b) => {
     if (a === DEFAULT_TAB) {
       return -1;
@@ -497,8 +517,9 @@ export function computeVisualPanelDiff(lhs: unknown, rhs: unknown): VisualPanelD
   const tabs: TabDiffSection[] = sortedTabs.map((tabTitle) => {
     const baseTab = baseGrouped.get(tabTitle);
     const newTab = newGrouped.get(tabTitle);
-    const tabStatus: TabDiffSection['tabStatus'] =
-      baseTab && newTab ? 'both' : baseTab ? 'removed' : 'added';
+    const inBase = Boolean(baseTab || baseAutoByTab.has(tabTitle));
+    const inNew = Boolean(newTab || newAutoByTab.has(tabTitle));
+    const tabStatus: TabDiffSection['tabStatus'] = inBase && inNew ? 'both' : inBase ? 'removed' : 'added';
 
     const rowTitles = new Set<string>([
       ...(baseTab ? [...baseTab.keys()] : []),
