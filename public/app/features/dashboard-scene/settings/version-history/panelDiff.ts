@@ -327,8 +327,16 @@ function extractV1Panels(data: Record<string, unknown>): { grid: PanelSnapshot[]
     rowOffsetY =
       (typeof rowGridPos.y === 'number' ? rowGridPos.y : 0) + (typeof rowGridPos.h === 'number' ? rowGridPos.h : 1);
     // Collapsed rows keep their children on the row itself instead of as following top-level panels.
-    if (Array.isArray(panel.panels)) {
-      panel.panels.forEach(pushPanel);
+    if (panel.collapsed === true) {
+      const children = Array.isArray(panel.panels) ? panel.panels : [];
+      // Children keep the y they had when the row was collapsed, so offset from the first child like toggleRow does.
+      const firstChild = children.find(isRecord);
+      const firstGridPos = firstChild && isRecord(firstChild.gridPos) ? firstChild.gridPos : {};
+      rowOffsetY = typeof firstGridPos.y === 'number' ? firstGridPos.y : rowOffsetY;
+      children.forEach(pushPanel);
+      // Top-level panels after a collapsed row are not part of it.
+      currentRow = DEFAULT_ROW;
+      rowOffsetY = 0;
     }
   }
 
