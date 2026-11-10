@@ -5,10 +5,9 @@ import { Trans, t } from '@grafana/i18n';
 import { Button, ModalsController, CollapsableSection, useStyles2, Stack, Icon, Box } from '@grafana/ui';
 import { type DecoratedRevisionModel } from 'app/features/dashboard/types/revisionModels';
 
-import { DiffGroup } from './DiffGroup';
 import LazyDiffViewer from './LazyDiffViewer';
 import { RevertDashboardModal } from './RevertDashboardModal';
-import { jsonDiff } from './utils';
+import { VisualPanelDiff } from './VisualPanelDiff';
 
 type DiffViewProps = {
   isNewLatest: boolean;
@@ -19,7 +18,6 @@ type DiffViewProps = {
 };
 
 export const VersionHistoryComparison = ({ baseInfo, newInfo, diffData, isNewLatest, onRestore }: DiffViewProps) => {
-  const diff = jsonDiff(diffData.lhs, diffData.rhs);
   const styles = useStyles2(getStyles);
 
   return (
@@ -72,9 +70,7 @@ export const VersionHistoryComparison = ({ baseInfo, newInfo, diffData, isNewLat
         )}
       </Stack>
 
-      {Object.entries(diff).map(([key, diffs]) => (
-        <DiffGroup diffs={diffs} key={key} title={key} />
-      ))}
+      <VisualPanelDiff lhs={diffData.lhs} rhs={diffData.rhs} />
 
       <Box paddingTop={2}>
         <CollapsableSection
