@@ -54,7 +54,7 @@ export const Pagination = ({
 
     return pages.reduce<JSX.Element[]>((pagesToRender, pageIndex) => {
       const page = pageIndex + 1;
-      const variant: ButtonVariant = page === currentPage ? 'primary' : 'secondary';
+      const variant: ButtonVariant = pageIndex === currentPage ? 'primary' : 'secondary';
 
       // The indexes at which to start and stop condensing pages
       const lowerBoundIndex = pageLengthToCondense;
