@@ -57,6 +57,15 @@ describe('Login Page', () => {
     expect(screen.getByRole('link', { name: 'Sign up' })).toHaveAttribute('href', '/signup');
   });
 
+  it('shows the GLK webhook test note without blocking login controls', () => {
+    render(<LoginPage />);
+
+    expect(screen.getByRole('status', { name: 'GLK webhook test' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Email or username' })).toBeEnabled();
+    expect(screen.getByLabelText('Password')).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeEnabled();
+  });
+
   it('should pass validation checks for username field', async () => {
     render(<LoginPage />);
 

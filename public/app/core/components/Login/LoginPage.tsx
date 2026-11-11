@@ -47,6 +47,8 @@ const LoginPage = () => {
                   </Alert>
                 )}
 
+                <Alert className={styles.alert} severity="info" title={t('login.glk-webhook-test', 'GLK webhook test')} />
+
                 {!disableLoginForm && (
                   <LoginForm
                     onSubmit={login}
